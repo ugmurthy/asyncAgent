@@ -1,0 +1,40 @@
+import type { ToolDefinition } from './tool.js';
+
+export type LLMProviderType = 'openai' | 'openrouter' | 'ollama';
+
+export interface LLMCallParams {
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant' | 'tool';
+    content: string;
+    name?: string;
+  }>;
+  tools: ToolDefinition[];
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface LLMResponse {
+  thought: string;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    arguments: Record<string, any>;
+  }>;
+  finishReason: 'stop' | 'tool_calls' | 'length' | 'content_filter';
+}
+
+export interface LLMProvider {
+  name: string;
+  callWithTools(params: LLMCallParams): Promise<LLMResponse>;
+  validateToolCallSupport(model: string): Promise<{ 
+    supported: boolean; 
+    message?: string 
+  }>;
+}
+
+export interface ProviderConfig {
+  provider: LLMProviderType;
+  apiKey?: string;
+  baseUrl?: string;
+  model: string;
+}
