@@ -56,7 +56,9 @@ NODE_ENV=production pnpm --filter backend start
 
 ## Environment Setup
 
-Copy `.env.example` to `.env` and configure:
+**Important:** The backend uses dotenv to load environment variables from a `.env` file.
+
+Copy `.env.example` to `.env` in the root directory and configure:
 
 ### For OpenAI
 ```bash

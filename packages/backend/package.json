@@ -18,6 +18,7 @@
     "@fastify/env": "^4.3.0",
     "@fastify/rate-limit": "^9.1.0",
     "better-sqlite3": "^9.2.2",
+    "dotenv": "^16.3.1",
     "drizzle-orm": "^0.29.2",
     "fastify": "^4.25.2",
     "nanoid": "^5.0.4",
