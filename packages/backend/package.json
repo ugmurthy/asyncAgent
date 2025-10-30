@@ -7,8 +7,11 @@
     "dev": "tsx watch src/app/server.ts",
     "build": "tsup",
     "start": "node dist/app/server.js",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "db:generate": "drizzle-kit generate:sqlite",
+    "db:push": "drizzle-kit push:sqlite",
     "db:studio": "drizzle-kit studio",
     "clean": "rm -rf dist"
   },
@@ -17,7 +20,7 @@
     "@fastify/cors": "^8.5.0",
     "@fastify/env": "^4.3.0",
     "@fastify/rate-limit": "^9.1.0",
-    "better-sqlite3": "^9.2.2",
+    "better-sqlite3": "^12.4.1",
     "cheerio": "^1.0.0-rc.12",
     "dotenv": "^16.3.1",
     "drizzle-orm": "^0.29.2",
@@ -38,9 +41,11 @@
     "@types/node": "^20.10.0",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^7.0.3",
+    "@vitest/ui": "^4.0.5",
     "drizzle-kit": "^0.20.10",
     "tsup": "^8.0.1",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.5"
   }
 }

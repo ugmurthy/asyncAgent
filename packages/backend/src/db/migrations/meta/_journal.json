@@ -1,0 +1,13 @@
+{
+  "version": "5",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1761816570565,
+      "tag": "0000_swift_toxin",
+      "breakpoints": true
+    }
+  ]
+}

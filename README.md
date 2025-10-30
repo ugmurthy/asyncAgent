@@ -216,6 +216,19 @@ pnpm build
 pnpm clean
 ```
 
+### Database
+
+```bash
+# Generate migrations (after schema changes)
+pnpm --filter backend db:generate
+
+# Push schema changes to database
+pnpm --filter backend db:push
+
+# Open Drizzle Studio (DB GUI)
+pnpm --filter backend db:studio
+```
+
 ## Technology Stack
 
 ### Backend

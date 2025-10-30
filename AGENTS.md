@@ -34,8 +34,8 @@ pnpm --filter cli dev
 # Generate migrations (after schema changes)
 pnpm --filter backend db:generate
 
-# Run migrations
-pnpm --filter backend db:migrate
+# Push schema changes to database
+pnpm --filter backend db:push
 
 # Open Drizzle Studio (DB GUI)
 pnpm --filter backend db:studio
