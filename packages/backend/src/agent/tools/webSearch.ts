@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BaseTool } from './base.js';
 import type { ToolContext } from '@async-agent/shared';
+import * as cheerio from 'cheerio';
 
 const webSearchInputSchema = z.object({
   query: z.string().describe('The search query'),
@@ -49,21 +50,32 @@ export class WebSearchTool extends BaseTool<WebSearchInput, SearchResult[]> {
   private parseSearchResults(html: string, limit: number): SearchResult[] {
     const results: SearchResult[] = [];
     
-    // Simple regex-based parsing (in production, use a proper HTML parser)
-    const resultPattern = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([^<]+)<\/a>/g;
-    
-    let match;
-    while ((match = resultPattern.exec(html)) !== null && results.length < limit) {
-      const url = this.cleanUrl(match[1]);
-      const title = this.cleanText(match[2]);
-      const snippet = this.cleanText(match[3]);
+    try {
+      const $ = cheerio.load(html);
       
-      if (url && title) {
-        results.push({ title, url, snippet });
-      }
+      // Parse DuckDuckGo search results
+      $('.result').each((_, element) => {
+        if (results.length >= limit) return false;
+        
+        const titleLink = $(element).find('.result__a');
+        const snippetElem = $(element).find('.result__snippet');
+        
+        const href = titleLink.attr('href');
+        const title = titleLink.text().trim();
+        const snippet = snippetElem.text().trim();
+        
+        if (href && title) {
+          const url = this.cleanUrl(href);
+          if (url) {
+            results.push({ title, url, snippet });
+          }
+        }
+      });
+    } catch (error) {
+      // If parsing fails, return fallback
     }
 
-    // Fallback: if regex parsing fails, return mock results for demo
+    // Fallback: if parsing fails, return mock results for demo
     if (results.length === 0) {
       return [{
         title: 'Search results unavailable',
@@ -79,18 +91,12 @@ export class WebSearchTool extends BaseTool<WebSearchInput, SearchResult[]> {
     // DuckDuckGo wraps URLs in a redirect
     const match = url.match(/uddg=([^&]+)/);
     if (match) {
-      return decodeURIComponent(match[1]);
+      try {
+        return decodeURIComponent(match[1]);
+      } catch {
+        return '';
+      }
     }
     return url;
-  }
-
-  private cleanText(text: string): string {
-    return text
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .trim();
   }
 }

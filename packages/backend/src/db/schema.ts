@@ -11,7 +11,7 @@ export const goals = sqliteTable('goals', {
     constraints?: Record<string, any>;
   }>(),
   webhookUrl: text('webhook_url'),
-  status: text('status', { enum: ['active', 'paused', 'archived'] }).notNull().default('active'),
+  status: text('status', { enum: ['active', 'paused', 'archived'] }).notNull().default(sql`'active'`),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
@@ -28,10 +28,10 @@ export const schedules = sqliteTable('schedules', {
 export const runs = sqliteTable('runs', {
   id: text('id').primaryKey(),
   goalId: text('goal_id').notNull().references(() => goals.id, { onDelete: 'cascade' }),
-  status: text('status', { enum: ['pending', 'running', 'completed', 'failed'] }).notNull().default('pending'),
+  status: text('status', { enum: ['pending', 'running', 'completed', 'failed'] }).notNull().default(sql`'pending'`),
   startedAt: integer('started_at', { mode: 'timestamp' }),
   endedAt: integer('ended_at', { mode: 'timestamp' }),
-  workingMemory: text('working_memory', { mode: 'json' }).notNull().$type<Record<string, any>>().default({}),
+  workingMemory: text('working_memory', { mode: 'json' }).notNull().$type<Record<string, any>>().default(sql`'{}'`),
   stepBudget: integer('step_budget').notNull(),
   stepsExecuted: integer('steps_executed').notNull().default(0),
   error: text('error'),

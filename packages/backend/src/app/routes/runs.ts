@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { runs, steps } from '../../db/schema.js';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 
 export async function runsRoutes(fastify: FastifyInstance) {
   const { db } = fastify;
@@ -9,7 +9,17 @@ export async function runsRoutes(fastify: FastifyInstance) {
   fastify.get('/runs', async (request, reply) => {
     const { goalId, status } = request.query as { goalId?: string; status?: string };
 
-    let query = db.query.runs.findMany({
+    // Build where conditions
+    const conditions = [];
+    if (goalId) {
+      conditions.push(eq(runs.goalId, goalId));
+    }
+    if (status) {
+      conditions.push(eq(runs.status, status as any));
+    }
+
+    const allRuns = await db.query.runs.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
       with: {
         goal: true,
       },
@@ -17,18 +27,7 @@ export async function runsRoutes(fastify: FastifyInstance) {
       limit: 50,
     });
 
-    // Apply filters if needed (note: drizzle-orm filtering in queries is limited)
-    const allRuns = await query;
-    
-    let filtered = allRuns;
-    if (goalId) {
-      filtered = filtered.filter(r => r.goalId === goalId);
-    }
-    if (status) {
-      filtered = filtered.filter(r => r.status === status);
-    }
-
-    reply.send(filtered);
+    reply.send(allRuns);
   });
 
   // Get run by ID

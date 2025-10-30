@@ -88,43 +88,71 @@ export class AgentOrchestrator {
 
         // Execute tool calls if any
         if (planResult.toolCalls && planResult.toolCalls.length > 0) {
-          const toolCall = planResult.toolCalls[0]; // Execute first tool call
-          toolName = toolCall.name;
-          toolInput = toolCall.arguments;
+          // Execute all tool calls in parallel
+          const toolResults = await Promise.allSettled(
+            planResult.toolCalls.map(async (toolCall) => {
+              const tool = toolRegistry.get(toolCall.name);
+              if (!tool) {
+                throw new Error(`Tool not found: ${toolCall.name}`);
+              }
 
-          logger.info(`Executing tool: ${toolName}`, toolInput);
+              // Validate input
+              const validatedInput = tool.inputSchema.parse(toolCall.arguments);
 
-          try {
-            const tool = toolRegistry.get(toolName);
-            if (!tool) {
-              throw new Error(`Tool not found: ${toolName}`);
+              // Execute tool
+              const result = await tool.execute(validatedInput, {
+                logger,
+                db,
+                runId,
+                abortSignal: abortController.signal,
+              });
+
+              return { name: toolCall.name, result };
+            })
+          );
+
+          // Process results
+          const observations: string[] = [];
+          const errors: string[] = [];
+          
+          toolResults.forEach((result, index) => {
+            const toolCall = planResult.toolCalls![index];
+            
+            if (result.status === 'fulfilled') {
+              const { name, result: toolResult } = result.value;
+              
+              // Store first tool name for backward compatibility
+              if (!toolName) {
+                toolName = name;
+                toolInput = toolCall.arguments;
+              }
+              
+              // Update working memory with result
+              workingMemory = {
+                ...workingMemory,
+                [`step_${currentStep}_${name}`]: toolResult,
+              };
+              
+              const resultStr = typeof toolResult === 'string' 
+                ? toolResult 
+                : JSON.stringify(toolResult, null, 2);
+              observations.push(`[${name}] ${resultStr}`);
+              
+              logger.info(`Tool executed successfully: ${name}`);
+            } else {
+              const errorMsg = result.reason instanceof Error 
+                ? result.reason.message 
+                : String(result.reason);
+              errors.push(`[${toolCall.name}] Error: ${errorMsg}`);
+              logger.error(`Tool execution failed: ${toolCall.name}`, result.reason);
             }
+          });
 
-            // Validate input
-            const validatedInput = tool.inputSchema.parse(toolInput);
-
-            // Execute tool
-            const result = await tool.execute(validatedInput, {
-              logger,
-              db,
-              runId,
-              abortSignal: abortController.signal,
-            });
-
-            observation = typeof result === 'string' 
-              ? result 
-              : JSON.stringify(result, null, 2);
-
-            // Update working memory with result
-            workingMemory = {
-              ...workingMemory,
-              [`step_${currentStep}_${toolName}`]: result,
-            };
-
-          } catch (error) {
-            stepError = error instanceof Error ? error.message : String(error);
-            observation = `Error: ${stepError}`;
-            logger.error(`Tool execution failed:`, error);
+          // Combine all observations and errors
+          observation = [...observations, ...errors].join('\n\n');
+          
+          if (errors.length > 0 && observations.length === 0) {
+            stepError = errors.join('; ');
           }
         }
 
