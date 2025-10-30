@@ -4,6 +4,7 @@ import { FetchPageTool } from './fetchPage.js';
 import { WriteFileTool } from './writeFile.js';
 import { ReadFileTool } from './readFile.js';
 import { SendWebhookTool } from './sendWebhook.js';
+import { SendEmailTool } from './sendEmail.js';
 
 export class ToolRegistry {
   private tools = new Map<string, Tool>();
@@ -18,6 +19,7 @@ export class ToolRegistry {
     this.register(new WriteFileTool());
     this.register(new ReadFileTool());
     this.register(new SendWebhookTool());
+    this.register(new SendEmailTool());
   }
 
   register(tool: Tool): void {
@@ -58,3 +60,4 @@ export * from './fetchPage.js';
 export * from './writeFile.js';
 export * from './readFile.js';
 export * from './sendWebhook.js';
+export * from './sendEmail.js';
