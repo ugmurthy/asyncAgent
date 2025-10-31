@@ -14,4 +14,6 @@ export interface GoalParams {
   stepBudget?: number;
   allowedTools?: string[];
   constraints?: Record<string, any>;
+  temperature?: number;
+  maxTokens?: number;
 }

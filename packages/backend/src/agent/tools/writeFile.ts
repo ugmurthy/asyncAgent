@@ -29,13 +29,14 @@ export class WriteFileTool extends BaseTool<WriteFileInput, WriteFileOutput> {
 
   async execute(input: WriteFileInput, ctx: ToolContext): Promise<WriteFileOutput> {
     // Security: prevent path traversal
-    const safePath = input.path.replace(/\.\./g, '');
-    const fullPath = join(this.ARTIFACTS_DIR, safePath);
+    const fullPath = resolve(this.ARTIFACTS_DIR, input.path);
 
     // Ensure path is within artifacts directory
     if (!fullPath.startsWith(this.ARTIFACTS_DIR)) {
       throw new Error('Invalid path: must be within artifacts directory');
     }
+
+    const safePath = fullPath.substring(this.ARTIFACTS_DIR.length + 1);
 
     ctx.logger.info(`Writing file: ${safePath}`);
 

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { z } from 'zod';
 
 const envSchema = z.object({
@@ -22,6 +23,8 @@ const envSchema = z.object({
   // Agent
   DEFAULT_STEP_BUDGET: z.string().default('20'),
   DEFAULT_TOOL_TIMEOUT: z.string().default('60000'),
+  DEFAULT_TEMPERATURE: z.string().default('0.7'),
+  DEFAULT_MAX_TOKENS: z.string().default('2000'),
 
   // Logging
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),

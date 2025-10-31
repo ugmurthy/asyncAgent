@@ -8,6 +8,7 @@ import { TaskQueue } from './queue.js';
 import { AgentOrchestrator } from '../agent/orchestrator.js';
 import type { LLMProvider } from '@async-agent/shared';
 import { ToolRegistry } from '../agent/tools/index.js';
+import { env } from '../util/env.js';
 
 export interface SchedulerConfig {
   db: Database;
@@ -131,7 +132,7 @@ export class CronScheduler {
 
     // Create a new run
     const runId = generateRunId();
-    const stepBudget = goal.params?.stepBudget || parseInt(process.env.DEFAULT_STEP_BUDGET || '20');
+    const stepBudget = goal.params?.stepBudget || parseInt(env.DEFAULT_STEP_BUDGET);
 
     await db.insert(runs).values({
       id: runId,

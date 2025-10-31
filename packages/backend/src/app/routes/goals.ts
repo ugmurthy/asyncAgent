@@ -59,11 +59,11 @@ export async function goalsRoutes(
 
   // List goals
   fastify.get('/goals', async (request, reply) => {
-    const { status } = request.query as { status?: string };
+    const { status } = request.query as { status?: 'active' | 'paused' | 'archived' };
 
     const allGoals = status
       ? await db.query.goals.findMany({
-          where: eq(goals.status, status as any),
+          where: eq(goals.status, status),
           orderBy: (goals, { desc }) => [desc(goals.createdAt)],
         })
       : await db.query.goals.findMany({

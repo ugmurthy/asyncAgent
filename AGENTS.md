@@ -54,6 +54,31 @@ pnpm --filter backend start
 NODE_ENV=production pnpm --filter backend start
 ```
 
+### CLI Usage
+
+```bash
+# Initialize configuration
+async-agent init
+
+# Manage goals
+async-agent goal create          # Create new goal
+async-agent goal list            # List all goals
+async-agent goal show <id>       # Show goal details
+async-agent goal delete <id>     # Delete a goal
+async-agent goal pause <id>      # Pause a goal
+async-agent goal resume <id>     # Resume a goal
+
+# Manage runs
+async-agent run list             # List all runs
+async-agent run show <id>        # Show run details
+async-agent run logs <id>        # View run logs/steps
+
+# Manage server
+async-agent server start         # Start backend
+async-agent server stop          # Stop backend
+async-agent server status        # Check server status
+```
+
 ## Environment Setup
 
 **Important:** The backend uses dotenv to load environment variables from a `.env` file.

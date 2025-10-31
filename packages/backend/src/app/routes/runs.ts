@@ -7,7 +7,7 @@ export async function runsRoutes(fastify: FastifyInstance) {
 
   // List runs
   fastify.get('/runs', async (request, reply) => {
-    const { goalId, status } = request.query as { goalId?: string; status?: string };
+    const { goalId, status } = request.query as { goalId?: string; status?: 'pending' | 'running' | 'completed' | 'failed' };
 
     // Build where conditions
     const conditions = [];
@@ -15,7 +15,7 @@ export async function runsRoutes(fastify: FastifyInstance) {
       conditions.push(eq(runs.goalId, goalId));
     }
     if (status) {
-      conditions.push(eq(runs.status, status as any));
+      conditions.push(eq(runs.status, status));
     }
 
     const allRuns = await db.query.runs.findMany({

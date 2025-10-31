@@ -76,6 +76,8 @@ export class AgentOrchestrator {
           stepHistory,
           stepsRemaining,
           tools: toolDefinitions,
+          temperature: goal.params?.temperature,
+          maxTokens: goal.params?.maxTokens,
         });
 
         const stepStartTime = Date.now();
@@ -130,7 +132,7 @@ export class AgentOrchestrator {
               // Update working memory with result
               workingMemory = {
                 ...workingMemory,
-                [`step_${currentStep}_${name}`]: toolResult,
+                [`step_${currentStep}_${name}_${index}`]: toolResult,
               };
               
               const resultStr = typeof toolResult === 'string' 
@@ -205,6 +207,8 @@ export class AgentOrchestrator {
         stepHistory,
         stepsRemaining: 0,
         tools: toolDefinitions,
+        temperature: goal.params?.temperature,
+        maxTokens: goal.params?.maxTokens,
       });
 
       // Mark run as completed
@@ -220,11 +224,6 @@ export class AgentOrchestrator {
         .where(eq(runs.id, runId));
 
       logger.info(`Run completed: ${runId}`);
-
-      // TODO: Send webhook notification if configured
-      if (goal.webhookUrl) {
-        logger.info(`Webhook notification skipped (not implemented yet)`);
-      }
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);

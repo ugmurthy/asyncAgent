@@ -1,5 +1,6 @@
 import type { LLMProvider, LLMCallParams, ToolDefinition } from '@async-agent/shared';
 import type { Logger } from '../util/logger.js';
+import { env } from '../util/env.js';
 
 export interface PlannerContext {
   objective: string;
@@ -13,6 +14,8 @@ export interface PlannerContext {
   }>;
   stepsRemaining: number;
   tools: ToolDefinition[];
+  temperature?: number;
+  maxTokens?: number;
 }
 
 export interface PlannerResult {
@@ -42,14 +45,17 @@ export class AgentPlanner {
     });
 
     try {
+      const temperature = context.temperature ?? parseFloat(env.DEFAULT_TEMPERATURE);
+      const maxTokens = context.maxTokens ?? parseInt(env.DEFAULT_MAX_TOKENS);
+
       const response = await this.llmProvider.callWithTools({
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
         tools: context.tools,
-        temperature: 0.7,
-        maxTokens: 2000,
+        temperature,
+        maxTokens,
       });
 
       const shouldFinish = 
@@ -126,13 +132,16 @@ ${JSON.stringify(context.workingMemory, null, 2)}
 Provide a clear, concise summary of what was accomplished and any key findings or outputs.`;
 
     try {
+      const temperature = context.temperature ?? parseFloat(env.DEFAULT_TEMPERATURE);
+      const maxTokens = context.maxTokens ?? parseInt(env.DEFAULT_MAX_TOKENS);
+
       const response = await this.llmProvider.callWithTools({
         messages: [
           { role: 'user', content: summaryPrompt },
         ],
         tools: [],
-        temperature: 0.5,
-        maxTokens: 1000,
+        temperature: temperature * 0.7,
+        maxTokens: Math.floor(maxTokens / 2),
       });
 
       return response.thought;

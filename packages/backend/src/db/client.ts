@@ -46,7 +46,10 @@ export function closeDatabase() {
 }
 
 export function runMigrations() {
-  const { db, sqlite } = dbInstance || createDatabase();
+  if (!dbInstance) {
+    dbInstance = createDatabase();
+  }
+  const { db, sqlite } = dbInstance;
   
   try {
     migrate(db, { migrationsFolder: './src/db/migrations' });
