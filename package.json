@@ -10,7 +10,12 @@
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean && rm -rf node_modules"
   },
-  "keywords": ["ai", "agent", "llm", "automation"],
+  "keywords": [
+    "ai",
+    "agent",
+    "llm",
+    "automation"
+  ],
   "author": "",
   "license": "MIT",
   "engines": {
@@ -18,7 +23,12 @@
     "pnpm": ">=8.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
+    "@types/node": "^22.18.13",
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "ora": "^9.0.0"
   }
 }
