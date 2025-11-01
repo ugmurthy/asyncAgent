@@ -1,0 +1,44 @@
+{
+  "name": "@async-agent/api-js-client",
+  "version": "0.1.0",
+  "description": "TypeScript/JavaScript client for Async Agent API",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "generate": "bash ../../../scripts/generate-js-client.sh",
+    "build": "tsc",
+    "clean": "rm -rf dist generated",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:check-generate": "npm run generate && git diff --exit-code src/"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "async-agent",
+    "api-client",
+    "typescript",
+    "openapi"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "openapi-typescript-codegen": "^0.29.0",
+    "typescript": "^5.3.3",
+    "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "form-data": "^4.0.0"
+  }
+}

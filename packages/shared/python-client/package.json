@@ -1,0 +1,17 @@
+{
+  "name": "@async-agent/api-py-client",
+  "version": "0.1.0",
+  "description": "Python client for Async Agent API",
+  "scripts": {
+    "generate": "bash ../../../scripts/generate-python-client.sh",
+    "test:check-generate": "npm run generate && git diff --exit-code async_agent_client/"
+  },
+  "keywords": [
+    "async-agent",
+    "api-client",
+    "python",
+    "openapi"
+  ],
+  "author": "",
+  "license": "MIT"
+}

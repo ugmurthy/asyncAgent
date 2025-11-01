@@ -8,7 +8,9 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
-    "clean": "pnpm -r clean && rm -rf node_modules"
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "generate": "pnpm --filter @async-agent/api-js-client run generate && pnpm --filter @async-agent/api-py-client run generate",
+    "test:check-generate": "pnpm generate && git diff --exit-code packages/shared/js-client/src packages/shared/python-client/async_agent_client"
   },
   "keywords": [
     "ai",
@@ -29,6 +31,7 @@
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
-    "ora": "^9.0.0"
+    "ora": "^9.0.0",
+    "yaml": "^2.8.1"
   }
 }

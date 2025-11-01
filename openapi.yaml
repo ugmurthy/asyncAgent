@@ -1,0 +1,919 @@
+openapi: 3.1.0
+info:
+  title: Async Agent API
+  version: 0.1.0
+  description: |
+    RESTful API for managing autonomous agent goals, scheduled tasks, and run executions.
+    Built with Fastify, uses SQLite for persistence, and supports multiple LLM providers.
+  contact:
+    name: API Support
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development server
+  - url: http://localhost:3000
+    description: Health check endpoints
+
+security:
+  - bearerAuth: []
+  - {}
+
+tags:
+  - name: health
+    description: Health and readiness checks
+  - name: goals
+    description: Goal management operations
+  - name: runs
+    description: Run execution and monitoring
+
+paths:
+  /health:
+    get:
+      tags:
+        - health
+      summary: Get health status
+      description: Returns basic health status of the API
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                timestamp: '2025-10-30T10:30:00.000Z'
+
+  /health/ready:
+    get:
+      tags:
+        - health
+      summary: Get readiness status
+      description: Returns detailed readiness status including LLM provider and scheduler info
+      operationId: getHealthReady
+      security: []
+      responses:
+        '200':
+          description: API is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+              example:
+                status: ready
+                provider: openai
+                model: gpt-4o
+                scheduler:
+                  activeSchedules: 3
+                timestamp: '2025-10-30T10:30:00.000Z'
+
+  /api/v1/goals:
+    get:
+      tags:
+        - goals
+      summary: List all goals
+      description: Retrieve all goals with optional status filtering
+      operationId: listGoals
+      parameters:
+        - $ref: '#/components/parameters/GoalStatusQuery'
+      responses:
+        '200':
+          description: List of goals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GoalWithSchedules'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - goals
+      summary: Create a new goal
+      description: Create a new goal with optional schedule configuration
+      operationId: createGoal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGoalRequest'
+            examples:
+              basic:
+                summary: Basic goal
+                value:
+                  objective: Monitor GitHub repository for new issues and summarize them daily
+                  params:
+                    stepBudget: 20
+              withSchedule:
+                summary: Goal with schedule
+                value:
+                  objective: Daily market analysis
+                  params:
+                    stepBudget: 30
+                    allowedTools:
+                      - web_search
+                      - web_scrape
+                  schedule:
+                    cronExpr: 0 9 * * *
+                    timezone: UTC
+      responses:
+        '201':
+          description: Goal created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/goals/{id}:
+    get:
+      tags:
+        - goals
+      summary: Get goal by ID
+      description: Retrieve a specific goal with its schedules
+      operationId: getGoal
+      parameters:
+        - $ref: '#/components/parameters/GoalId'
+      responses:
+        '200':
+          description: Goal details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalWithSchedules'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - goals
+      summary: Update goal
+      description: Update goal properties (objective, params, webhookUrl, status)
+      operationId: updateGoal
+      parameters:
+        - $ref: '#/components/parameters/GoalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGoalRequest'
+            example:
+              objective: Updated objective text
+              status: paused
+      responses:
+        '200':
+          description: Goal updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - goals
+      summary: Delete goal
+      description: Delete a goal and all its associated schedules and runs
+      operationId: deleteGoal
+      parameters:
+        - $ref: '#/components/parameters/GoalId'
+      responses:
+        '204':
+          description: Goal deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/goals/{id}/run:
+    post:
+      tags:
+        - goals
+      summary: Trigger goal run
+      description: Manually trigger a goal execution
+      operationId: triggerGoalRun
+      parameters:
+        - $ref: '#/components/parameters/GoalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
+      responses:
+        '200':
+          description: Run triggered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TriggerRunResponse'
+              example:
+                runId: run_abc123
+                message: Run triggered successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/goals/{id}/pause:
+    post:
+      tags:
+        - goals
+      summary: Pause goal
+      description: Pause a goal and deactivate its schedules
+      operationId: pauseGoal
+      parameters:
+        - $ref: '#/components/parameters/GoalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
+      responses:
+        '200':
+          description: Goal paused successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Goal paused successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/goals/{id}/resume:
+    post:
+      tags:
+        - goals
+      summary: Resume goal
+      description: Resume a paused goal and reactivate its schedules
+      operationId: resumeGoal
+      parameters:
+        - $ref: '#/components/parameters/GoalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
+      responses:
+        '200':
+          description: Goal resumed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Goal resumed successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/runs:
+    get:
+      tags:
+        - runs
+      summary: List all runs
+      description: Retrieve all runs (limited to 50 most recent) with optional status filtering
+      operationId: listRuns
+      parameters:
+        - $ref: '#/components/parameters/RunStatusQuery'
+      responses:
+        '200':
+          description: List of runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RunWithGoal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/runs/{id}:
+    get:
+      tags:
+        - runs
+      summary: Get run by ID
+      description: Retrieve a specific run with its associated goal
+      operationId: getRun
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Run details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunWithGoal'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - runs
+      summary: Delete run
+      description: Delete a specific run and all its steps
+      operationId: deleteRun
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '204':
+          description: Run deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/runs/{id}/steps:
+    get:
+      tags:
+        - runs
+      summary: Get run steps
+      description: Retrieve all execution steps for a specific run
+      operationId: getRunSteps
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: List of steps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Step'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for API authentication
+
+  parameters:
+    GoalId:
+      name: id
+      in: path
+      required: true
+      description: Goal ID (format goal_xxxxx)
+      schema:
+        type: string
+        pattern: ^goal_[a-z0-9]+$
+      example: goal_abc123
+
+    RunId:
+      name: id
+      in: path
+      required: true
+      description: Run ID (format run_xxxxx)
+      schema:
+        type: string
+        pattern: ^run_[a-z0-9]+$
+      example: run_xyz789
+
+    GoalStatusQuery:
+      name: status
+      in: query
+      required: false
+      description: Filter goals by status
+      schema:
+        $ref: '#/components/schemas/GoalStatus'
+
+    RunStatusQuery:
+      name: status
+      in: query
+      required: false
+      description: Filter runs by status
+      schema:
+        $ref: '#/components/schemas/RunStatus'
+
+  schemas:
+    GoalStatus:
+      type: string
+      enum:
+        - active
+        - paused
+        - archived
+      description: Status of a goal
+
+    RunStatus:
+      type: string
+      enum:
+        - pending
+        - running
+        - completed
+        - failed
+      description: Status of a run execution
+
+    OutputKind:
+      type: string
+      enum:
+        - summary
+        - file
+        - webhook
+        - email
+      description: Type of output delivery
+
+    MemoryType:
+      type: string
+      enum:
+        - note
+        - fact
+        - artifact
+      description: Type of memory entry
+
+    GoalParams:
+      type: object
+      properties:
+        stepBudget:
+          type: integer
+          minimum: 1
+          description: Maximum number of steps allowed
+          example: 20
+        allowedTools:
+          type: array
+          items:
+            type: string
+          description: List of tools the agent can use
+          example:
+            - web_search
+            - web_scrape
+        constraints:
+          type: object
+          additionalProperties: true
+          description: Additional constraints for the goal
+          example:
+            maxRetries: 3
+      additionalProperties: false
+
+    Goal:
+      type: object
+      required:
+        - id
+        - objective
+        - params
+        - status
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          pattern: ^goal_[a-z0-9]+$
+          description: Unique goal identifier
+          example: goal_abc123
+        objective:
+          type: string
+          minLength: 10
+          maxLength: 1000
+          description: The goal objective description
+          example: Monitor GitHub repository for new issues
+        params:
+          $ref: '#/components/schemas/GoalParams'
+        webhookUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Optional webhook URL for notifications
+          example: https://example.com/webhook
+        status:
+          $ref: '#/components/schemas/GoalStatus'
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp
+          example: '2025-10-30T10:30:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp
+          example: '2025-10-30T10:30:00.000Z'
+
+    Schedule:
+      type: object
+      required:
+        - id
+        - goalId
+        - cronExpr
+        - timezone
+        - active
+        - createdAt
+      properties:
+        id:
+          type: string
+          pattern: ^sched_[a-z0-9]+$
+          description: Unique schedule identifier
+          example: sched_xyz789
+        goalId:
+          type: string
+          pattern: ^goal_[a-z0-9]+$
+          description: Associated goal ID
+          example: goal_abc123
+        cronExpr:
+          type: string
+          description: Cron expression for scheduling
+          example: 0 9 * * *
+        timezone:
+          type: string
+          description: Timezone for schedule
+          default: UTC
+          example: UTC
+        active:
+          type: boolean
+          description: Whether schedule is active
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp
+          example: '2025-10-30T10:30:00.000Z'
+
+    GoalWithSchedules:
+      allOf:
+        - $ref: '#/components/schemas/Goal'
+        - type: object
+          required:
+            - schedules
+          properties:
+            schedules:
+              type: array
+              items:
+                $ref: '#/components/schemas/Schedule'
+              description: Associated schedules
+
+    Run:
+      type: object
+      required:
+        - id
+        - goalId
+        - status
+        - workingMemory
+        - stepBudget
+        - stepsExecuted
+        - createdAt
+      properties:
+        id:
+          type: string
+          pattern: ^run_[a-z0-9]+$
+          description: Unique run identifier
+          example: run_xyz789
+        goalId:
+          type: string
+          pattern: ^goal_[a-z0-9]+$
+          description: Associated goal ID
+          example: goal_abc123
+        status:
+          $ref: '#/components/schemas/RunStatus'
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO 8601 timestamp
+          example: '2025-10-30T10:30:00.000Z'
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO 8601 timestamp
+          example: '2025-10-30T10:35:00.000Z'
+        workingMemory:
+          type: object
+          additionalProperties: true
+          description: Agent's working memory during execution
+          example:
+            lastChecked: '2025-10-30T10:30:00.000Z'
+        stepBudget:
+          type: integer
+          minimum: 1
+          description: Maximum steps allowed
+          example: 20
+        stepsExecuted:
+          type: integer
+          minimum: 0
+          description: Number of steps executed
+          example: 15
+        error:
+          type: string
+          nullable: true
+          description: Error message if run failed
+          example: null
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp
+          example: '2025-10-30T10:30:00.000Z'
+
+    RunWithGoal:
+      allOf:
+        - $ref: '#/components/schemas/Run'
+        - type: object
+          required:
+            - goal
+          properties:
+            goal:
+              $ref: '#/components/schemas/Goal'
+
+    Step:
+      type: object
+      required:
+        - id
+        - runId
+        - stepNo
+        - thought
+        - durationMs
+        - createdAt
+      properties:
+        id:
+          type: string
+          pattern: ^step_[a-z0-9]+$
+          description: Unique step identifier
+          example: step_abc123
+        runId:
+          type: string
+          pattern: ^run_[a-z0-9]+$
+          description: Associated run ID
+          example: run_xyz789
+        stepNo:
+          type: integer
+          minimum: 1
+          description: Step sequence number
+          example: 1
+        thought:
+          type: string
+          description: Agent's reasoning for this step
+          example: I need to search for recent GitHub issues
+        toolName:
+          type: string
+          nullable: true
+          description: Tool used in this step
+          example: web_search
+        toolInput:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Input parameters for the tool
+          example:
+            query: github issues
+        observation:
+          type: string
+          nullable: true
+          description: Result of tool execution
+          example: Found 5 new issues
+        durationMs:
+          type: integer
+          minimum: 0
+          description: Step execution time in milliseconds
+          example: 1500
+        error:
+          type: string
+          nullable: true
+          description: Error message if step failed
+          example: null
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp
+          example: '2025-10-30T10:30:00.000Z'
+
+    CreateGoalRequest:
+      type: object
+      required:
+        - objective
+      properties:
+        objective:
+          type: string
+          minLength: 10
+          maxLength: 1000
+          description: The goal objective description
+          example: Monitor GitHub repository for new issues
+        params:
+          $ref: '#/components/schemas/GoalParams'
+        webhookUrl:
+          type: string
+          format: uri
+          description: Optional webhook URL for notifications
+          example: https://example.com/webhook
+        schedule:
+          type: object
+          required:
+            - cronExpr
+          properties:
+            cronExpr:
+              type: string
+              description: Cron expression
+              example: 0 9 * * *
+            timezone:
+              type: string
+              description: Timezone for schedule
+              default: UTC
+              example: UTC
+          additionalProperties: false
+      additionalProperties: false
+
+    UpdateGoalRequest:
+      type: object
+      properties:
+        objective:
+          type: string
+          minLength: 10
+          maxLength: 1000
+          description: Updated goal objective
+          example: Updated objective text
+        params:
+          $ref: '#/components/schemas/GoalParams'
+        webhookUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Updated webhook URL
+          example: https://example.com/webhook
+        status:
+          $ref: '#/components/schemas/GoalStatus'
+      additionalProperties: false
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+          example: ok
+        timestamp:
+          type: string
+          format: date-time
+          example: '2025-10-30T10:30:00.000Z'
+
+    ReadinessResponse:
+      type: object
+      required:
+        - status
+        - provider
+        - model
+        - scheduler
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+            - ready
+          example: ready
+        provider:
+          type: string
+          description: LLM provider name
+          example: openai
+        model:
+          type: string
+          description: LLM model name
+          example: gpt-4o
+        scheduler:
+          type: object
+          required:
+            - activeSchedules
+          properties:
+            activeSchedules:
+              type: integer
+              minimum: 0
+              description: Number of active schedules
+              example: 3
+        timestamp:
+          type: string
+          format: date-time
+          example: '2025-10-30T10:30:00.000Z'
+
+    TriggerRunResponse:
+      type: object
+      required:
+        - runId
+        - message
+      properties:
+        runId:
+          type: string
+          pattern: ^run_[a-z0-9]+$
+          description: ID of the triggered run
+          example: run_abc123
+        message:
+          type: string
+          example: Run triggered successfully
+
+    MessageResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: Operation completed successfully
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+          example: Resource not found
+
+  responses:
+    BadRequest:
+      description: Bad Request - validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Invalid request parameters
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Resource not found
+
+    TooManyRequests:
+      description: Too many requests - rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Rate limit exceeded. Maximum 100 requests per minute.
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Internal server error
