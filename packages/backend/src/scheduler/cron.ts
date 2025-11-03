@@ -147,7 +147,9 @@ export class CronScheduler {
     logger.info(`Created run: ${runId}`);
 
     // Add to execution queue
-    await this.queue.add({
+    // await this.queue.add({
+    // removed await to ensure this is non-blocking 1/Nov/2025
+    this.queue.add({
       id: runId,
       execute: async () => {
         await this.orchestrator.executeRun(runId);
