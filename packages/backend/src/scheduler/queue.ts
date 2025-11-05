@@ -55,6 +55,7 @@ export class TaskQueue {
     return {
       size: this.queue.size,
       pending: this.queue.pending,
+      concurrency: this.queue.concurrency,
       isPaused: this.queue.isPaused,
     };
   }

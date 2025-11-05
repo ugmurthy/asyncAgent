@@ -16,6 +16,7 @@ export interface PlannerContext {
   tools: ToolDefinition[];
   temperature?: number;
   maxTokens?: number;
+  constraints?: string | string[];
 }
 
 export interface PlannerResult {
@@ -60,9 +61,7 @@ export class AgentPlanner {
       });
 
       const shouldFinish = 
-        response.finishReason === 'stop' ||
-        !response.toolCalls ||
-        response.toolCalls.length === 0 ||
+        (response.finishReason === 'stop' && (!response.toolCalls || response.toolCalls.length === 0)) ||
         context.stepsRemaining <= 0;
 
       return {
@@ -77,19 +76,60 @@ export class AgentPlanner {
   }
 
   private buildSystemPrompt(context: PlannerContext): string {
+    const toolsList = context.tools
+      .map(t => `- ${t.function.name}: ${t.function.description}`)
+      .join('\n');
+    
+    const workingMemory = JSON.stringify(context.workingMemory, null, 2);
+    
+    const constraintsText = context.constraints
+      ? Array.isArray(context.constraints)
+        ? context.constraints.map(c => `- ${c}`).join('\n')
+        : context.constraints
+      : '';
+    
+    this.logger.debug('Prompt template placeholder values:', {
+      usingCustomTemplate: !!this.promptTemplate,
+      objective: context.objective,
+      toolsList,
+      stepsRemaining: context.stepsRemaining,
+      workingMemory,
+      constraints: constraintsText,
+    });
+    
     if (this.promptTemplate) {
-      const toolsList = context.tools
-        .map(t => `- ${t.function.name}: ${t.function.description}`)
-        .join('\n');
+      // Check for unknown placeholders
+      const knownPlaceholders = ['objective', 'toolsList', 'stepsRemaining', 'workingMemory', 'constraints'];
+      const placeholderPattern = /\{\{(\w+)\}\}/g;
+      const foundPlaceholders = new Set<string>();
+      let match;
       
-      const workingMemory = JSON.stringify(context.workingMemory, null, 2);
+      while ((match = placeholderPattern.exec(this.promptTemplate)) !== null) {
+        foundPlaceholders.add(match[1]);
+      }
+      
+      const unknownPlaceholders = Array.from(foundPlaceholders).filter(
+        p => !knownPlaceholders.includes(p)
+      );
+      
+      if (unknownPlaceholders.length > 0) {
+        this.logger.warn('Unknown placeholders found in prompt template:', {
+          unknownPlaceholders,
+          knownPlaceholders,
+        });
+      }
       
       return this.promptTemplate
         .replace(/\{\{objective\}\}/g, context.objective)
         .replace(/\{\{toolsList\}\}/g, toolsList)
         .replace(/\{\{stepsRemaining\}\}/g, String(context.stepsRemaining))
-        .replace(/\{\{workingMemory\}\}/g, workingMemory);
+        .replace(/\{\{workingMemory\}\}/g, workingMemory)
+        .replace(/\{\{constraints\}\}/g, constraintsText);
     }
+    
+    const constraintsSection = constraintsText
+      ? `\nConstraints:\n${constraintsText}\n`
+      : '';
     
     return `You are an autonomous AI agent designed to achieve goals by breaking them down into steps and using available tools.
 
@@ -105,7 +145,7 @@ Guidelines:
 4. When you have sufficient information or completed the task, provide a final summary
 5. Be concise and focused on the objective
 6. You have ${context.stepsRemaining} steps remaining in your budget
-
+${constraintsSection}
 Working memory (your scratchpad):
 ${JSON.stringify(context.workingMemory, null, 2)}`;
   }

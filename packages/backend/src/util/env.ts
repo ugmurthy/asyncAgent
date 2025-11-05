@@ -25,6 +25,7 @@ const envSchema = z.object({
   DEFAULT_TOOL_TIMEOUT: z.string().default('60000'),
   DEFAULT_TEMPERATURE: z.string().default('0.7'),
   DEFAULT_MAX_TOKENS: z.string().default('2000'),
+  MAX_CONCURRENT_RUNS: z.string().default('3'),
 
   // Logging
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),

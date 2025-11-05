@@ -92,6 +92,7 @@ export class AgentOrchestrator {
           tools: toolDefinitions,
           temperature: goal.params?.temperature,
           maxTokens: goal.params?.maxTokens,
+          constraints: goal.params?.constraints,
         });
 
         const stepStartTime = Date.now();

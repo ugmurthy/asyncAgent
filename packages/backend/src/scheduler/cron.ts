@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import type { Database } from '../db/client.js';
 import type { Logger } from '../util/logger.js';
 import { schedules, runs, goals } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { generateRunId } from '@async-agent/shared';
 import { TaskQueue } from './queue.js';
 import { AgentOrchestrator } from '../agent/orchestrator.js';
@@ -23,7 +23,8 @@ export class CronScheduler {
   private orchestrator: AgentOrchestrator;
 
   constructor(private config: SchedulerConfig) {
-    this.queue = new TaskQueue(config.logger, { concurrency: 1 });
+    const maxConcurrency = parseInt(env.MAX_CONCURRENT_RUNS) || 3;
+    this.queue = new TaskQueue(config.logger, { concurrency: maxConcurrency });
     this.orchestrator = new AgentOrchestrator({
       db: config.db,
       logger: config.logger,
@@ -117,6 +118,14 @@ export class CronScheduler {
 
     logger.info(`Triggering goal: ${goalId}`);
 
+    // Check concurrent run limits
+    const activeRuns = await this.getActiveRunsCount();
+    const maxRuns = parseInt(env.MAX_CONCURRENT_RUNS) || 3;
+
+    if (activeRuns >= maxRuns) {
+      throw new Error(`Maximum concurrent runs (${maxRuns}) exceeded. Current active runs: ${activeRuns}`);
+    }
+
     // Get goal details
     const goal = await db.query.goals.findFirst({
       where: eq(goals.id, goalId),
@@ -159,9 +168,22 @@ export class CronScheduler {
     return runId;
   }
 
+  private async getActiveRunsCount(): Promise<number> {
+    const { db } = this.config;
+
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(runs)
+      .where(eq(runs.status, 'running'));
+
+    return result[0]?.count || 0;
+  }
+
   getStats() {
+    const maxConcurrency = parseInt(env.MAX_CONCURRENT_RUNS) || 3;
     return {
       activeSchedules: this.tasks.size,
+      maxConcurrency,
       queue: this.queue.getStats(),
     };
   }
