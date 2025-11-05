@@ -2,8 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { GoalParams } from './GoalParams';
-import type { GoalStatus } from './GoalStatus';
+import type { GoalParams } from './GoalParams.js';
+import type { GoalStatus } from './GoalStatus.js';
 export type UpdateGoalRequest = {
     /**
      * Updated goal objective

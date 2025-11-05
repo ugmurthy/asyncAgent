@@ -99,6 +99,11 @@ export class ApiClient {
         throw error;
       }
 
+      // Handle 204 No Content responses
+      if (response.status === 204) {
+        return undefined as T;
+      }
+
       return await response.json();
     } catch (err: any) {
       clearTimeout(timeoutId);

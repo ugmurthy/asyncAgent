@@ -2,7 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { GoalStatus } from './GoalStatus';
+import type { GoalStatus } from './GoalStatus.js';
 /**
  * Filter goals by status
  */

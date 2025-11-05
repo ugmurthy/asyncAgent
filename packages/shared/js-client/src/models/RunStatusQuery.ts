@@ -2,7 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { RunStatus } from './RunStatus';
+import type { RunStatus } from './RunStatus.js';
 /**
  * Filter runs by status
  */

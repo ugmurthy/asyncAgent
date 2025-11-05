@@ -2,14 +2,16 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { BaseHttpRequest } from './core/BaseHttpRequest';
-import type { OpenAPIConfig } from './core/OpenAPI';
-import { AxiosHttpRequest } from './core/AxiosHttpRequest';
-import { GoalsService } from './services/GoalsService';
-import { HealthService } from './services/HealthService';
-import { RunsService } from './services/RunsService';
+import type { BaseHttpRequest } from './core/BaseHttpRequest.js';
+import type { OpenAPIConfig } from './core/OpenAPI.js';
+import { AxiosHttpRequest } from './core/AxiosHttpRequest.js';
+import { AgentsService } from './services/AgentsService.js';
+import { GoalsService } from './services/GoalsService.js';
+import { HealthService } from './services/HealthService.js';
+import { RunsService } from './services/RunsService.js';
 type HttpRequestConstructor = new (config: OpenAPIConfig) => BaseHttpRequest;
 export class AsyncAgentClient {
+    public readonly agents: AgentsService;
     public readonly goals: GoalsService;
     public readonly health: HealthService;
     public readonly runs: RunsService;
@@ -26,6 +28,7 @@ export class AsyncAgentClient {
             HEADERS: config?.HEADERS,
             ENCODE_PATH: config?.ENCODE_PATH,
         });
+        this.agents = new AgentsService(this.request);
         this.goals = new GoalsService(this.request);
         this.health = new HealthService(this.request);
         this.runs = new RunsService(this.request);

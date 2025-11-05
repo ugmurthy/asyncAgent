@@ -27,6 +27,8 @@ tags:
     description: Goal management operations
   - name: runs
     description: Run execution and monitoring
+  - name: agents
+    description: Agent management operations
 
 paths:
   /health:
@@ -406,6 +408,185 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/agents:
+    get:
+      tags:
+        - agents
+      summary: List all agents
+      description: Retrieve all agents with optional filtering by name or active status
+      operationId: listAgents
+      parameters:
+        - name: name
+          in: query
+          required: false
+          description: Filter agents by name
+          schema:
+            type: string
+        - name: active
+          in: query
+          required: false
+          description: Filter agents by active status
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Agent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - agents
+      summary: Create a new agent
+      description: Register a new agent version with name, version, and prompt template
+      operationId: createAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentRequest'
+      responses:
+        '201':
+          description: Agent created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Agent with this name and version already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/agents/{id}:
+    get:
+      tags:
+        - agents
+      summary: Get agent by ID
+      description: Retrieve a specific agent by its ID
+      operationId: getAgent
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      responses:
+        '200':
+          description: Agent details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - agents
+      summary: Delete agent
+      description: Delete a specific agent (must not be active)
+      operationId: deleteAgent
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      responses:
+        '204':
+          description: Agent deleted successfully
+        '400':
+          description: Cannot delete active agent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/agents/{id}/activate:
+    post:
+      tags:
+        - agents
+      summary: Activate an agent
+      description: Activate an agent and deactivate other versions with the same name
+      operationId: activateAgent
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
+      responses:
+        '200':
+          description: Agent activated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/agents/resolve/{name}:
+    get:
+      tags:
+        - agents
+      summary: Resolve active agent by name
+      description: Get the currently active agent for a given name
+      operationId: resolveAgent
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Agent name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Active agent found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+        '404':
+          description: No active agent found with this name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -434,6 +615,16 @@ components:
         type: string
         pattern: ^run_[a-z0-9]+$
       example: run_xyz789
+
+    AgentId:
+      name: id
+      in: path
+      required: true
+      description: Agent ID (format agent_xxxxx)
+      schema:
+        type: string
+        pattern: ^agent_[a-z0-9]+$
+      example: agent_abc123
 
     GoalStatusQuery:
       name: status
@@ -737,6 +928,84 @@ components:
           format: date-time
           description: ISO 8601 timestamp
           example: '2025-10-30T10:30:00.000Z'
+
+    Agent:
+      type: object
+      required:
+        - id
+        - name
+        - version
+        - promptTemplate
+        - active
+        - metadata
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          pattern: ^agent_[a-z0-9]+$
+          description: Unique agent identifier
+          example: agent_abc123
+        name:
+          type: string
+          description: Agent name
+          example: defaultAgent
+        version:
+          type: string
+          description: Agent version
+          example: 1.0.0
+        promptTemplate:
+          type: string
+          description: Agent prompt template
+          example: You are a helpful assistant that...
+        active:
+          type: boolean
+          description: Whether this agent version is active
+          example: true
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional agent metadata
+          example: {}
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp
+          example: '2025-10-30T10:30:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp
+          example: '2025-10-30T10:30:00.000Z'
+
+    CreateAgentRequest:
+      type: object
+      required:
+        - name
+        - version
+        - promptTemplate
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Agent name
+          example: defaultAgent
+        version:
+          type: string
+          minLength: 1
+          description: Agent version
+          example: 1.0.0
+        promptTemplate:
+          type: string
+          minLength: 1
+          description: Agent prompt template
+          example: You are a helpful assistant that...
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional agent metadata
+          example: {}
+      additionalProperties: false
 
     CreateGoalRequest:
       type: object

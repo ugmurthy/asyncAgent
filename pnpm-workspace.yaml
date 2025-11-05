@@ -2,3 +2,4 @@ packages:
   - 'packages/*'
   - 'packages/shared/js-client'
   - 'packages/shared/python-client'
+  - 'packages/webApp'

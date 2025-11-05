@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 
@@ -11,6 +11,7 @@ export const goals = sqliteTable('goals', {
     constraints?: Record<string, any>;
   }>(),
   webhookUrl: text('webhook_url'),
+  agentId: text('agent_id'),
   status: text('status', { enum: ['active', 'paused', 'archived'] }).notNull().default(sql`'active'`),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
@@ -68,6 +69,20 @@ export const memories = sqliteTable('memories', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
+export const agents = sqliteTable('agents', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  version: text('version').notNull(),
+  promptTemplate: text('prompt_template').notNull(),
+  active: integer('active', { mode: 'boolean' }).notNull().default(false),
+  metadata: text('metadata', { mode: 'json' }).$type<Record<string, any>>(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+}, (table) => ({
+  uniqueNameVersion: uniqueIndex('idx_name_version').on(table.name, table.version),
+  uniqueActiveNameIdx: uniqueIndex('idx_active_agent').on(table.name).where(sql`${table.active} = 1`),
+}));
+
 export type Goal = typeof goals.$inferSelect;
 export type NewGoal = typeof goals.$inferInsert;
 export type Schedule = typeof schedules.$inferSelect;
@@ -80,6 +95,8 @@ export type Output = typeof outputs.$inferSelect;
 export type NewOutput = typeof outputs.$inferInsert;
 export type Memory = typeof memories.$inferSelect;
 export type NewMemory = typeof memories.$inferInsert;
+export type Agent = typeof agents.$inferSelect;
+export type NewAgent = typeof agents.$inferInsert;
 
 // Relations
 export const goalsRelations = relations(goals, ({ many }) => ({
@@ -123,4 +140,8 @@ export const memoriesRelations = relations(memories, ({ one }) => ({
     fields: [memories.goalId],
     references: [goals.id],
   }),
+}));
+
+export const agentsRelations = relations(agents, ({ many }) => ({
+  goals: many(goals),
 }));

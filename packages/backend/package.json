@@ -25,6 +25,7 @@
     "dotenv": "^16.3.1",
     "drizzle-orm": "^0.29.2",
     "fastify": "^4.25.2",
+    "lodash": "^4.17.21",
     "nanoid": "^5.0.4",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.7",

@@ -119,6 +119,19 @@ generate_client() {
     log_info "Client generation complete"
 }
 
+# Add .js extensions to imports for ESM compatibility
+add_js_extensions() {
+    log_info "Adding .js extensions to imports for ESM compatibility..."
+    
+    # Find all .ts files and add .js extension to relative imports
+    find "${SRC_DIR}" -name "*.ts" -type f -exec sed -i '' \
+        -e "s|from '\\.\\([^']*\\)'|from '.\\1.js'|g" \
+        -e 's|from "\.\\([^"]*\\)"|from ".\\1.js"|g' \
+        {} +
+    
+    log_info ".js extensions added"
+}
+
 # Main execution
 main() {
     log_info "Starting JavaScript/TypeScript SDK generation..."
@@ -132,6 +145,8 @@ main() {
     update_package_version "${VERSION}"
     
     generate_client
+    
+    add_js_extensions
     
     log_info "✅ JavaScript/TypeScript SDK generated successfully!"
     log_info "Location: ${SRC_DIR}"

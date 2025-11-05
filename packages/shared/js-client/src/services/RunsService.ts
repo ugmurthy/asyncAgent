@@ -2,11 +2,11 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { RunStatus } from '../models/RunStatus';
-import type { RunWithGoal } from '../models/RunWithGoal';
-import type { Step } from '../models/Step';
-import type { CancelablePromise } from '../core/CancelablePromise';
-import type { BaseHttpRequest } from '../core/BaseHttpRequest';
+import type { RunStatus } from '../models/RunStatus.js';
+import type { RunWithGoal } from '../models/RunWithGoal.js';
+import type { Step } from '../models/Step.js';
+import type { CancelablePromise } from '../core/CancelablePromise.js';
+import type { BaseHttpRequest } from '../core/BaseHttpRequest.js';
 export class RunsService {
     constructor(public readonly httpRequest: BaseHttpRequest) {}
     /**

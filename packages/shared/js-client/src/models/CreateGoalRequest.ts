@@ -2,7 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { GoalParams } from './GoalParams';
+import type { GoalParams } from './GoalParams.js';
 export type CreateGoalRequest = {
     /**
      * The goal objective description

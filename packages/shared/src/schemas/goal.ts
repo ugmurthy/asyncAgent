@@ -10,6 +10,8 @@ export const createGoalSchema = z.object({
   objective: z.string().min(10).max(1000),
   params: goalParamsSchema.optional(),
   webhookUrl: z.string().url().optional(),
+  agentName: z.string().optional(),
+  agentId: z.string().optional(),
   schedule: z.object({
     cronExpr: z.string(),
     timezone: z.string().default('UTC'),

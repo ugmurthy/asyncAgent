@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { createGoalSchema, updateGoalSchema, generateGoalId, generateId } from '@async-agent/shared';
-import { goals, schedules } from '../../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { goals, schedules, agents } from '../../db/schema.js';
+import { eq, and } from 'drizzle-orm';
 import type { CronScheduler } from '../../scheduler/cron.js';
 
 export async function goalsRoutes(
@@ -14,6 +14,48 @@ export async function goalsRoutes(
   fastify.post('/goals', async (request, reply) => {
     const body = createGoalSchema.parse(request.body);
 
+    let agentId: string | undefined;
+    
+    if ('agentName' in body && body.agentName) {
+      const agent = await db.query.agents.findFirst({
+        where: and(
+          eq(agents.name, body.agentName),
+          eq(agents.active, true)
+        ),
+      });
+      
+      if (!agent) {
+        return reply.code(400).send({ 
+          error: `No active agent found with name: ${body.agentName}` 
+        });
+      }
+      
+      agentId = agent.id;
+    } else if ('agentId' in body && body.agentId) {
+      const agent = await db.query.agents.findFirst({
+        where: eq(agents.id, body.agentId),
+      });
+      
+      if (!agent) {
+        return reply.code(400).send({ 
+          error: `Agent not found with id: ${body.agentId}` 
+        });
+      }
+      
+      agentId = agent.id;
+    } else {
+      const defaultAgent = await db.query.agents.findFirst({
+        where: and(
+          eq(agents.name, 'defaultAgent'),
+          eq(agents.active, true)
+        ),
+      });
+      
+      if (defaultAgent) {
+        agentId = defaultAgent.id;
+      }
+    }
+
     const goalId = generateGoalId();
     
     await db.insert(goals).values({
@@ -21,6 +63,7 @@ export async function goalsRoutes(
       objective: body.objective,
       params: body.params || {},
       webhookUrl: body.webhookUrl,
+      agentId,
       status: 'active',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -65,9 +108,15 @@ export async function goalsRoutes(
       ? await db.query.goals.findMany({
           where: eq(goals.status, status),
           orderBy: (goals, { desc }) => [desc(goals.createdAt)],
+          with: {
+            schedules: true,
+          },
         })
       : await db.query.goals.findMany({
           orderBy: (goals, { desc }) => [desc(goals.createdAt)],
+          with: {
+            schedules: true,
+          },
         });
 
     reply.send(allGoals);

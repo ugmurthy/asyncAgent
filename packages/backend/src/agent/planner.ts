@@ -31,7 +31,8 @@ export interface PlannerResult {
 export class AgentPlanner {
   constructor(
     private llmProvider: LLMProvider,
-    private logger: Logger
+    private logger: Logger,
+    private promptTemplate?: string
   ) {}
 
   async plan(context: PlannerContext): Promise<PlannerResult> {
@@ -76,6 +77,20 @@ export class AgentPlanner {
   }
 
   private buildSystemPrompt(context: PlannerContext): string {
+    if (this.promptTemplate) {
+      const toolsList = context.tools
+        .map(t => `- ${t.function.name}: ${t.function.description}`)
+        .join('\n');
+      
+      const workingMemory = JSON.stringify(context.workingMemory, null, 2);
+      
+      return this.promptTemplate
+        .replace(/\{\{objective\}\}/g, context.objective)
+        .replace(/\{\{toolsList\}\}/g, toolsList)
+        .replace(/\{\{stepsRemaining\}\}/g, String(context.stepsRemaining))
+        .replace(/\{\{workingMemory\}\}/g, workingMemory);
+    }
+    
     return `You are an autonomous AI agent designed to achieve goals by breaking them down into steps and using available tools.
 
 Your objective: ${context.objective}

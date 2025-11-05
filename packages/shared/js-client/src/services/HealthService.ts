@@ -2,10 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { HealthResponse } from '../models/HealthResponse';
-import type { ReadinessResponse } from '../models/ReadinessResponse';
-import type { CancelablePromise } from '../core/CancelablePromise';
-import type { BaseHttpRequest } from '../core/BaseHttpRequest';
+import type { HealthResponse } from '../models/HealthResponse.js';
+import type { ReadinessResponse } from '../models/ReadinessResponse.js';
+import type { CancelablePromise } from '../core/CancelablePromise.js';
+import type { BaseHttpRequest } from '../core/BaseHttpRequest.js';
 export class HealthService {
     constructor(public readonly httpRequest: BaseHttpRequest) {}
     /**

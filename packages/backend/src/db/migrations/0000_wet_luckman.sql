@@ -1,8 +1,20 @@
+CREATE TABLE `agents` (
+	`id` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`version` text NOT NULL,
+	`prompt_template` text NOT NULL,
+	`active` integer DEFAULT false NOT NULL,
+	`metadata` text,
+	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `goals` (
 	`id` text PRIMARY KEY NOT NULL,
 	`objective` text NOT NULL,
 	`params` text NOT NULL,
 	`webhook_url` text,
+	`agent_id` text,
 	`status` text DEFAULT 'active' NOT NULL,
 	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
 	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
@@ -64,3 +76,6 @@ CREATE TABLE `steps` (
 	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
 	FOREIGN KEY (`run_id`) REFERENCES `runs`(`id`) ON UPDATE no action ON DELETE cascade
 );
+--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_name_version` ON `agents` (`name`,`version`);--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_active_agent` ON `agents` (`name`) WHERE "agents"."active" = 1;

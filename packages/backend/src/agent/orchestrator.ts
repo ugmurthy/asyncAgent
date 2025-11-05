@@ -4,7 +4,7 @@ import type { LLMProvider } from '@async-agent/shared';
 import { generateStepId } from '@async-agent/shared';
 import { AgentPlanner } from './planner.js';
 import { ToolRegistry } from './tools/index.js';
-import { runs, steps } from '../db/schema.js';
+import { runs, steps, agents } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 
 export interface OrchestratorConfig {
@@ -15,11 +15,7 @@ export interface OrchestratorConfig {
 }
 
 export class AgentOrchestrator {
-  private planner: AgentPlanner;
-
-  constructor(private config: OrchestratorConfig) {
-    this.planner = new AgentPlanner(config.llmProvider, config.logger);
-  }
+  constructor(private config: OrchestratorConfig) {}
 
   async executeRun(runId: string): Promise<void> {
     const { db, logger, toolRegistry } = this.config;
@@ -37,6 +33,25 @@ export class AgentOrchestrator {
         throw new Error(`Run not found: ${runId}`);
       }
 
+      const goal = run.goal;
+      
+      let promptTemplate: string | undefined;
+      if (goal.agentId) {
+        const agent = await db.query.agents.findFirst({
+          where: eq(agents.id, goal.agentId),
+        });
+        
+        if (agent) {
+          promptTemplate = agent.promptTemplate;
+        }
+      }
+      
+      const planner = new AgentPlanner(
+        this.config.llmProvider, 
+        this.config.logger,
+        promptTemplate
+      );
+
       // Update run status to running
       await db.update(runs)
         .set({ 
@@ -45,7 +60,6 @@ export class AgentOrchestrator {
         })
         .where(eq(runs.id, runId));
 
-      const goal = run.goal;
       const stepBudget = run.stepBudget;
       const allowedTools = goal.params?.allowedTools;
       
@@ -70,7 +84,7 @@ export class AgentOrchestrator {
         logger.info(`Executing step ${currentStep}/${stepBudget}`);
 
         // Plan next step
-        const planResult = await this.planner.plan({
+        const planResult = await planner.plan({
           objective: goal.objective,
           workingMemory,
           stepHistory,
@@ -201,7 +215,7 @@ export class AgentOrchestrator {
       }
 
       // Generate final summary
-      const summary = await this.planner.generateSummary({
+      const summary = await planner.generateSummary({
         objective: goal.objective,
         workingMemory,
         stepHistory,

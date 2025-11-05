@@ -2,15 +2,15 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { CreateGoalRequest } from '../models/CreateGoalRequest';
-import type { Goal } from '../models/Goal';
-import type { GoalStatus } from '../models/GoalStatus';
-import type { GoalWithSchedules } from '../models/GoalWithSchedules';
-import type { MessageResponse } from '../models/MessageResponse';
-import type { TriggerRunResponse } from '../models/TriggerRunResponse';
-import type { UpdateGoalRequest } from '../models/UpdateGoalRequest';
-import type { CancelablePromise } from '../core/CancelablePromise';
-import type { BaseHttpRequest } from '../core/BaseHttpRequest';
+import type { CreateGoalRequest } from '../models/CreateGoalRequest.js';
+import type { Goal } from '../models/Goal.js';
+import type { GoalStatus } from '../models/GoalStatus.js';
+import type { GoalWithSchedules } from '../models/GoalWithSchedules.js';
+import type { MessageResponse } from '../models/MessageResponse.js';
+import type { TriggerRunResponse } from '../models/TriggerRunResponse.js';
+import type { UpdateGoalRequest } from '../models/UpdateGoalRequest.js';
+import type { CancelablePromise } from '../core/CancelablePromise.js';
+import type { BaseHttpRequest } from '../core/BaseHttpRequest.js';
 export class GoalsService {
     constructor(public readonly httpRequest: BaseHttpRequest) {}
     /**

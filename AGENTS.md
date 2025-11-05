@@ -54,6 +54,21 @@ pnpm --filter backend start
 NODE_ENV=production pnpm --filter backend start
 ```
 
+### Web Application
+
+```bash
+# Start web application in dev mode
+pnpm --filter @async-agent/webapp dev
+
+# Build web application
+pnpm --filter @async-agent/webapp build
+
+# Type check
+pnpm --filter @async-agent/webapp check
+
+# Access the web UI at http://localhost:5173
+```
+
 ### CLI Usage
 
 ```bash

@@ -10,6 +10,8 @@ import { defaultToolRegistry } from '../agent/tools/index.js';
 import { CronScheduler } from '../scheduler/cron.js';
 import { goalsRoutes } from './routes/goals.js';
 import { runsRoutes } from './routes/runs.js';
+import { agentsRoutes } from './routes/agents.js';
+import { seedDefaultAgent } from '../db/seed.js';
 
 const fastify = Fastify({
   logger: logger,
@@ -53,6 +55,7 @@ fastify.get('/health/ready', async () => {
 });
 
 // Register routes
+await fastify.register(agentsRoutes, { prefix: '/api/v1' });
 await fastify.register(goalsRoutes, { prefix: '/api/v1', scheduler });
 await fastify.register(runsRoutes, { prefix: '/api/v1' });
 
@@ -61,6 +64,9 @@ const start = async () => {
   try {
     const port = parseInt(env.PORT);
     const host = env.HOST;
+    
+    // Seed default agent
+    await seedDefaultAgent();
     
     // Start scheduler
     await scheduler.start();
