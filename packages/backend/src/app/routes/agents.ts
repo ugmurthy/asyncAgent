@@ -8,11 +8,22 @@ const createAgentSchema = z.object({
   name: z.string().min(1),
   version: z.string().min(1),
   promptTemplate: z.string().min(1),
+  provider: z.string().optional(),
+  model: z.string().optional(),
   metadata: z.record(z.any()).optional(),
 });
 
 const activateAgentSchema = z.object({
   id: z.string(),
+});
+
+const updateAgentSchema = z.object({
+  name: z.string().min(1).optional(),
+  version: z.string().min(1).optional(),
+  promptTemplate: z.string().min(1).optional(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  metadata: z.record(z.any()).optional(),
 });
 
 export async function agentsRoutes(fastify: FastifyInstance) {
@@ -41,6 +52,8 @@ export async function agentsRoutes(fastify: FastifyInstance) {
       name: body.name,
       version: body.version,
       promptTemplate: body.promptTemplate,
+      provider: body.provider,
+      model: body.model,
       active: false,
       metadata: body.metadata || {},
       createdAt: new Date(),
@@ -95,6 +108,52 @@ export async function agentsRoutes(fastify: FastifyInstance) {
     }
 
     reply.send(agent);
+  });
+
+  fastify.patch('/agents/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = updateAgentSchema.parse(request.body);
+
+    const agent = await db.query.agents.findFirst({
+      where: eq(agents.id, id),
+    });
+
+    if (!agent) {
+      return reply.code(404).send({ error: 'Agent not found' });
+    }
+
+    if (body.name && body.version && (body.name !== agent.name || body.version !== agent.version)) {
+      const existing = await db.query.agents.findFirst({
+        where: and(
+          eq(agents.name, body.name),
+          eq(agents.version, body.version)
+        ),
+      });
+
+      if (existing) {
+        return reply.code(409).send({
+          error: 'Agent with this name and version already exists'
+        });
+      }
+    }
+
+    const updates: any = { updatedAt: new Date() };
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.version !== undefined) updates.version = body.version;
+    if (body.promptTemplate !== undefined) updates.promptTemplate = body.promptTemplate;
+    if (body.provider !== undefined) updates.provider = body.provider;
+    if (body.model !== undefined) updates.model = body.model;
+    if (body.metadata !== undefined) updates.metadata = body.metadata;
+
+    await db.update(agents)
+      .set(updates)
+      .where(eq(agents.id, id));
+
+    const updated = await db.query.agents.findFirst({
+      where: eq(agents.id, id),
+    });
+
+    reply.send(updated);
   });
 
   fastify.post('/agents/:id/activate', async (request, reply) => {

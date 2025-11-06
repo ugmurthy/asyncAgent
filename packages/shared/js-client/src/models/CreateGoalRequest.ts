@@ -13,6 +13,14 @@ export type CreateGoalRequest = {
      * Optional webhook URL for notifications
      */
     webhookUrl?: string;
+    /**
+     * Optional agent name to use for this goal (uses active version)
+     */
+    agentName?: string;
+    /**
+     * Optional specific agent ID to use for this goal
+     */
+    agentId?: string;
     schedule?: {
         /**
          * Cron expression

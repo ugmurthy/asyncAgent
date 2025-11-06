@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { Agent } from '../models/Agent.js';
 import type { CreateAgentRequest } from '../models/CreateAgentRequest.js';
+import type { UpdateAgentRequest } from '../models/UpdateAgentRequest.js';
 import type { CancelablePromise } from '../core/CancelablePromise.js';
 import type { BaseHttpRequest } from '../core/BaseHttpRequest.js';
 export class AgentsService {
@@ -93,8 +94,40 @@ export class AgentsService {
         });
     }
     /**
+     * Update agent
+     * Update agent properties (name, version, promptTemplate, metadata)
+     * @returns Agent Agent updated successfully
+     * @throws ApiError
+     */
+    public updateAgent({
+        id,
+        requestBody,
+    }: {
+        /**
+         * Agent ID (format agent_xxxxx)
+         */
+        id: string,
+        requestBody: UpdateAgentRequest,
+    }): CancelablePromise<Agent> {
+        return this.httpRequest.request({
+            method: 'PATCH',
+            url: '/api/v1/agents/{id}',
+            path: {
+                'id': id,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                404: `Resource not found`,
+                409: `Agent with this name and version already exists`,
+                429: `Too many requests - rate limit exceeded`,
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
      * Delete agent
-     * Delete a specific agent (must not be active)
+     * Delete an inactive agent (cannot delete active agents)
      * @returns void
      * @throws ApiError
      */

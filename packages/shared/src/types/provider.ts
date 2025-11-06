@@ -11,6 +11,7 @@ export interface LLMCallParams {
   tools: ToolDefinition[];
   temperature?: number;
   maxTokens?: number;
+  reasoning?: Record<string, any>;
 }
 
 export interface LLMResponse {
@@ -21,6 +22,7 @@ export interface LLMResponse {
     arguments: Record<string, any>;
   }>;
   finishReason: 'stop' | 'tool_calls' | 'length' | 'content_filter';
+  reasoning?: string;
 }
 
 export interface LLMProvider {

@@ -25,6 +25,7 @@ export class OpenAIProvider implements LLMProvider {
         tools: params.tools as any,
         temperature: params.temperature ?? 0.7,
         max_tokens: params.maxTokens ?? 2000,
+        
       });
 
       const choice = response.choices[0];

@@ -1,4 +1,4 @@
-import { goals, runs } from '$lib/api/client';
+import { goals, runs, agents } from '$lib/api/client';
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
@@ -9,9 +9,20 @@ export const load: PageLoad = async ({ params }) => {
 			runs.listRuns({}).then(allRuns => allRuns.filter(run => run.goalId === params.id))
 		]);
 		
+		// Fetch agent if agentId is present
+		let agent = null;
+		if (goal.agentId) {
+			try {
+				agent = await agents.getAgent({ id: goal.agentId });
+			} catch (err) {
+				console.warn('Failed to load agent:', err);
+			}
+		}
+		
 		return { 
 			goal,
-			runs: goalRuns
+			runs: goalRuns,
+			agent
 		};
 	} catch (err) {
 		console.error('Failed to load goal:', err);

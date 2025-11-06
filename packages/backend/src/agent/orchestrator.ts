@@ -6,6 +6,7 @@ import { AgentPlanner } from './planner.js';
 import { ToolRegistry } from './tools/index.js';
 import { runs, steps, agents } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { createLLMProvider, validateLLMSetup } from './providers/index.js';
 
 export interface OrchestratorConfig {
   db: Database;
@@ -36,6 +37,8 @@ export class AgentOrchestrator {
       const goal = run.goal;
       
       let promptTemplate: string | undefined;
+      let llmProvider = this.config.llmProvider;
+      
       if (goal.agentId) {
         const agent = await db.query.agents.findFirst({
           where: eq(agents.id, goal.agentId),
@@ -43,11 +46,34 @@ export class AgentOrchestrator {
         
         if (agent) {
           promptTemplate = agent.promptTemplate;
+          
+          // Check if agent has custom provider/model
+          const hasProvider = agent.provider && agent.provider.length > 0;
+          const hasModel = agent.model && agent.model.length > 0;
+          
+          if (hasProvider || hasModel) {
+            try {
+              // Create custom LLM provider with agent's settings
+              llmProvider = createLLMProvider({
+                provider: hasProvider ? agent.provider : undefined,
+                model: hasModel ? agent.model : undefined,
+              });
+              
+              // Validate the custom provider
+              await validateLLMSetup(llmProvider, hasModel ? agent.model : undefined);
+              
+              logger.info(`Using custom provider/model for agent ${agent.name}: ${agent.provider || 'default'}/${agent.model || 'default'}`);
+            } catch (error) {
+              // Validation failed, fall back to default
+              logger.warn(`Failed to validate custom provider/model for agent ${agent.name}, using defaults: ${error instanceof Error ? error.message : String(error)}`);
+              llmProvider = this.config.llmProvider;
+            }
+          }
         }
       }
       
       const planner = new AgentPlanner(
-        this.config.llmProvider, 
+        llmProvider, 
         this.config.logger,
         promptTemplate
       );

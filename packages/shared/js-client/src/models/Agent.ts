@@ -20,6 +20,14 @@ export type Agent = {
      */
     promptTemplate: string;
     /**
+     * LLM provider for this agent
+     */
+    provider?: string;
+    /**
+     * LLM model for this agent
+     */
+    model?: string;
+    /**
      * Whether this agent version is active
      */
     active: boolean;

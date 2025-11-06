@@ -11,13 +11,18 @@ export class RunsService {
     constructor(public readonly httpRequest: BaseHttpRequest) {}
     /**
      * List all runs
-     * Retrieve all runs (limited to 50 most recent) with optional status filtering
+     * Retrieve all runs (limited to 50 most recent) with optional goalId and status filtering
      * @returns RunWithGoal List of runs
      * @throws ApiError
      */
     public listRuns({
+        goalId,
         status,
     }: {
+        /**
+         * Filter runs by goal ID
+         */
+        goalId?: string,
         /**
          * Filter runs by status
          */
@@ -27,6 +32,7 @@ export class RunsService {
             method: 'GET',
             url: '/api/v1/runs',
             query: {
+                'goalId': goalId,
                 'status': status,
             },
             errors: {

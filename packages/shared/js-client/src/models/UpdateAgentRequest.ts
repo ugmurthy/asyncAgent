@@ -2,19 +2,19 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type CreateAgentRequest = {
+export type UpdateAgentRequest = {
     /**
      * Agent name
      */
-    name: string;
+    name?: string;
     /**
      * Agent version
      */
-    version: string;
+    version?: string;
     /**
      * Agent prompt template
      */
-    promptTemplate: string;
+    promptTemplate?: string;
     /**
      * LLM provider for this agent
      */

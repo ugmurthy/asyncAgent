@@ -34,6 +34,7 @@ export type { RunWithGoal } from './models/RunWithGoal.js';
 export type { Schedule } from './models/Schedule.js';
 export type { Step } from './models/Step.js';
 export type { TriggerRunResponse } from './models/TriggerRunResponse.js';
+export type { UpdateAgentRequest } from './models/UpdateAgentRequest.js';
 export type { UpdateGoalRequest } from './models/UpdateGoalRequest.js';
 
 export { AgentsService } from './services/AgentsService.js';

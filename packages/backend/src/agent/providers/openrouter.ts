@@ -59,6 +59,10 @@ export class OpenRouterProvider implements LLMProvider {
 
   async callWithTools(params: LLMCallParams): Promise<LLMResponse> {
     try {
+
+
+
+      
       const response = await this.client.chat.completions.create({
         model: this.model,
         messages: params.messages as any,
@@ -66,6 +70,13 @@ export class OpenRouterProvider implements LLMProvider {
         temperature: params.temperature ?? 0.7,
         max_tokens: params.maxTokens ?? 2000,
       });
+      logger.debug(`call_with_tools : ${JSON.stringify({
+        model: this.model,
+        messages: params.messages as any,
+        tools: params.tools as any,
+        temperature: params.temperature ?? 0.7,
+        max_tokens: params.maxTokens ?? 2000,
+      },null,2)}`)
 
       const choice = response.choices[0];
       const message = choice.message;
@@ -75,6 +86,12 @@ export class OpenRouterProvider implements LLMProvider {
         name: tc.function.name,
         arguments: JSON.parse(tc.function.arguments),
       }));
+      const ret_val = {
+        thought: message.content || '',
+        toolCalls,
+        finishReason: this.mapFinishReason(choice.finish_reason),
+      };
+      logger.debug(`call_with_tools : ${JSON.stringify(ret_val,null,2)}`)
 
       return {
         thought: message.content || '',

@@ -1,8 +1,12 @@
 import type { FastifyInstance } from 'fastify';
-import { createGoalSchema, updateGoalSchema, generateGoalId, generateId } from '@async-agent/shared';
+import { createGoalSchemaFactory, updateGoalSchemaFactory, generateGoalId, generateId } from '@async-agent/shared';
 import { goals, schedules, agents } from '../../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import type { CronScheduler } from '../../scheduler/cron.js';
+import { env } from '../../util/env.js';
+
+const createGoalSchema = createGoalSchemaFactory(parseInt(env.MAX_MESSAGE_LENGTH, 10));
+const updateGoalSchema = updateGoalSchemaFactory(parseInt(env.MAX_MESSAGE_LENGTH, 10));
 
 export async function goalsRoutes(
   fastify: FastifyInstance,
@@ -217,6 +221,19 @@ export async function goalsRoutes(
       .set({ status: 'paused', updatedAt: new Date() })
       .where(eq(goals.id, id));
 
+    // Deactivate associated schedules
+    const goalSchedules = await db.query.schedules.findMany({
+      where: eq(schedules.goalId, id),
+    });
+
+    for (const schedule of goalSchedules) {
+      await db.update(schedules)
+        .set({ active: false })
+        .where(eq(schedules.id, schedule.id));
+      
+      scheduler?.unregisterSchedule(schedule.id);
+    }
+
     reply.send({ message: 'Goal paused' });
   });
 
@@ -226,6 +243,19 @@ export async function goalsRoutes(
     await db.update(goals)
       .set({ status: 'active', updatedAt: new Date() })
       .where(eq(goals.id, id));
+
+    // Reactivate associated schedules
+    const goalSchedules = await db.query.schedules.findMany({
+      where: eq(schedules.goalId, id),
+    });
+
+    for (const schedule of goalSchedules) {
+      await db.update(schedules)
+        .set({ active: true })
+        .where(eq(schedules.id, schedule.id));
+      
+      scheduler?.registerSchedule({ ...schedule, goal: { id } });
+    }
 
     reply.send({ message: 'Goal resumed' });
   });

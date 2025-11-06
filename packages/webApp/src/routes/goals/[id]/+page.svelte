@@ -16,6 +16,7 @@
 	
 	$: goal = data.goal;
 	$: goalRuns = data.runs;
+	$: agent = data.agent;
 	$: activeSchedule = goal.schedules?.find(s => s.active);
 	
 	async function triggerRun() {
@@ -129,6 +130,23 @@
 							<span class="text-muted-foreground">Status:</span>
 							<StatusBadge status={goal.status} type="goal" />
 						</div>
+						{#if agent}
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Agent:</span>
+							<Button 
+								variant="link" 
+								class="h-auto p-0 font-mono text-sm" 
+								onclick={() => goto(`/settings/agents/${agent.id}`)}
+							>
+								{agent.name}
+							</Button>
+						</div>
+						{:else if goal.agentId}
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Agent ID:</span>
+							<span class="font-mono text-sm">{goal.agentId}</span>
+						</div>
+						{/if}
 						<div class="flex justify-between">
 							<span class="text-muted-foreground">Created:</span>
 							<span class="text-sm">{formatDate(goal.createdAt)}</span>

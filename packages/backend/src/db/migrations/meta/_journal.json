@@ -8,6 +8,13 @@
       "when": 1762151014819,
       "tag": "0000_wet_luckman",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1762349889852,
+      "tag": "0001_large_boomerang",
+      "breakpoints": true
     }
   ]
 }

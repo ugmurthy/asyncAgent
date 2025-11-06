@@ -18,6 +18,10 @@ export type Goal = {
      * Optional webhook URL for notifications
      */
     webhookUrl?: string | null;
+    /**
+     * ID of the agent assigned to this goal
+     */
+    agentId?: string | null;
     status: GoalStatus;
     /**
      * ISO 8601 timestamp

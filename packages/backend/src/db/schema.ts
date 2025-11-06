@@ -74,6 +74,8 @@ export const agents = sqliteTable('agents', {
   name: text('name').notNull(),
   version: text('version').notNull(),
   promptTemplate: text('prompt_template').notNull(),
+  provider: text('provider'),
+  model: text('model'),
   active: integer('active', { mode: 'boolean' }).notNull().default(false),
   metadata: text('metadata', { mode: 'json' }).$type<Record<string, any>>(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),

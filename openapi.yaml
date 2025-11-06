@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Async Agent API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     RESTful API for managing autonomous agent goals, scheduled tasks, and run executions.
     Built with Fastify, uses SQLite for persistence, and supports multiple LLM providers.
@@ -40,15 +40,15 @@ paths:
       operationId: getHealth
       security: []
       responses:
-        '200':
+        "200":
           description: API is healthy
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthResponse'
+                $ref: "#/components/schemas/HealthResponse"
               example:
                 status: ok
-                timestamp: '2025-10-30T10:30:00.000Z'
+                timestamp: "2025-10-30T10:30:00.000Z"
 
   /health/ready:
     get:
@@ -59,19 +59,19 @@ paths:
       operationId: getHealthReady
       security: []
       responses:
-        '200':
+        "200":
           description: API is ready
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReadinessResponse'
+                $ref: "#/components/schemas/ReadinessResponse"
               example:
                 status: ready
                 provider: openai
                 model: gpt-4o
                 scheduler:
                   activeSchedules: 3
-                timestamp: '2025-10-30T10:30:00.000Z'
+                timestamp: "2025-10-30T10:30:00.000Z"
 
   /api/v1/goals:
     get:
@@ -81,22 +81,22 @@ paths:
       description: Retrieve all goals with optional status filtering
       operationId: listGoals
       parameters:
-        - $ref: '#/components/parameters/GoalStatusQuery'
+        - $ref: "#/components/parameters/GoalStatusQuery"
       responses:
-        '200':
+        "200":
           description: List of goals
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/GoalWithSchedules'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                  $ref: "#/components/schemas/GoalWithSchedules"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
     post:
       tags:
@@ -109,7 +109,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateGoalRequest'
+              $ref: "#/components/schemas/CreateGoalRequest"
             examples:
               basic:
                 summary: Basic goal
@@ -130,18 +130,18 @@ paths:
                     cronExpr: 0 9 * * *
                     timezone: UTC
       responses:
-        '201':
+        "201":
           description: Goal created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Goal'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: "#/components/schemas/Goal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/goals/{id}:
     get:
@@ -151,20 +151,20 @@ paths:
       description: Retrieve a specific goal with its schedules
       operationId: getGoal
       parameters:
-        - $ref: '#/components/parameters/GoalId'
+        - $ref: "#/components/parameters/GoalId"
       responses:
-        '200':
+        "200":
           description: Goal details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GoalWithSchedules'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: "#/components/schemas/GoalWithSchedules"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
     patch:
       tags:
@@ -173,31 +173,31 @@ paths:
       description: Update goal properties (objective, params, webhookUrl, status)
       operationId: updateGoal
       parameters:
-        - $ref: '#/components/parameters/GoalId'
+        - $ref: "#/components/parameters/GoalId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateGoalRequest'
+              $ref: "#/components/schemas/UpdateGoalRequest"
             example:
               objective: Updated objective text
               status: paused
       responses:
-        '200':
+        "200":
           description: Goal updated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Goal'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: "#/components/schemas/Goal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
     delete:
       tags:
@@ -206,16 +206,16 @@ paths:
       description: Delete a goal and all its associated schedules and runs
       operationId: deleteGoal
       parameters:
-        - $ref: '#/components/parameters/GoalId'
+        - $ref: "#/components/parameters/GoalId"
       responses:
-        '204':
+        "204":
           description: Goal deleted successfully
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/goals/{id}/run:
     post:
@@ -225,7 +225,7 @@ paths:
       description: Manually trigger a goal execution
       operationId: triggerGoalRun
       parameters:
-        - $ref: '#/components/parameters/GoalId'
+        - $ref: "#/components/parameters/GoalId"
       requestBody:
         required: true
         content:
@@ -235,21 +235,21 @@ paths:
               additionalProperties: false
             example: {}
       responses:
-        '200':
+        "200":
           description: Run triggered successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TriggerRunResponse'
+                $ref: "#/components/schemas/TriggerRunResponse"
               example:
                 runId: run_abc123
                 message: Run triggered successfully
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/goals/{id}/pause:
     post:
@@ -259,7 +259,7 @@ paths:
       description: Pause a goal and deactivate its schedules
       operationId: pauseGoal
       parameters:
-        - $ref: '#/components/parameters/GoalId'
+        - $ref: "#/components/parameters/GoalId"
       requestBody:
         required: true
         content:
@@ -269,20 +269,20 @@ paths:
               additionalProperties: false
             example: {}
       responses:
-        '200':
+        "200":
           description: Goal paused successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: "#/components/schemas/MessageResponse"
               example:
                 message: Goal paused successfully
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/goals/{id}/resume:
     post:
@@ -292,7 +292,7 @@ paths:
       description: Resume a paused goal and reactivate its schedules
       operationId: resumeGoal
       parameters:
-        - $ref: '#/components/parameters/GoalId'
+        - $ref: "#/components/parameters/GoalId"
       requestBody:
         required: true
         content:
@@ -302,45 +302,52 @@ paths:
               additionalProperties: false
             example: {}
       responses:
-        '200':
+        "200":
           description: Goal resumed successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: "#/components/schemas/MessageResponse"
               example:
                 message: Goal resumed successfully
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/runs:
     get:
       tags:
         - runs
       summary: List all runs
-      description: Retrieve all runs (limited to 50 most recent) with optional status filtering
+      description: Retrieve all runs (limited to 50 most recent) with optional goalId and status filtering
       operationId: listRuns
       parameters:
-        - $ref: '#/components/parameters/RunStatusQuery'
+        - name: goalId
+          in: query
+          required: false
+          description: Filter runs by goal ID
+          schema:
+            type: string
+            pattern: ^goal_[a-z0-9]+$
+        - $ref: "#/components/parameters/RunStatusQuery"
       responses:
-        '200':
+        "200":
           description: List of runs
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/RunWithGoal'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                  $ref: "#/components/schemas/RunWithGoal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/runs/{id}:
     get:
@@ -350,20 +357,20 @@ paths:
       description: Retrieve a specific run with its associated goal
       operationId: getRun
       parameters:
-        - $ref: '#/components/parameters/RunId'
+        - $ref: "#/components/parameters/RunId"
       responses:
-        '200':
+        "200":
           description: Run details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RunWithGoal'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: "#/components/schemas/RunWithGoal"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
     delete:
       tags:
@@ -372,16 +379,16 @@ paths:
       description: Delete a specific run and all its steps
       operationId: deleteRun
       parameters:
-        - $ref: '#/components/parameters/RunId'
+        - $ref: "#/components/parameters/RunId"
       responses:
-        '204':
+        "204":
           description: Run deleted successfully
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/runs/{id}/steps:
     get:
@@ -391,22 +398,22 @@ paths:
       description: Retrieve all execution steps for a specific run
       operationId: getRunSteps
       parameters:
-        - $ref: '#/components/parameters/RunId'
+        - $ref: "#/components/parameters/RunId"
       responses:
-        '200':
+        "200":
           description: List of steps
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Step'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                  $ref: "#/components/schemas/Step"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/agents:
     get:
@@ -428,22 +435,22 @@ paths:
           description: Filter agents by active status
           schema:
             type: string
-            enum: ['true', 'false']
+            enum: ["true", "false"]
       responses:
-        '200':
+        "200":
           description: List of agents
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Agent'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                  $ref: "#/components/schemas/Agent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
     post:
       tags:
@@ -456,26 +463,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateAgentRequest'
+              $ref: "#/components/schemas/CreateAgentRequest"
       responses:
-        '201':
+        "201":
           description: Agent created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Agent'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '409':
+                $ref: "#/components/schemas/Agent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
           description: Agent with this name and version already exists
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/agents/{id}:
     get:
@@ -485,44 +492,86 @@ paths:
       description: Retrieve a specific agent by its ID
       operationId: getAgent
       parameters:
-        - $ref: '#/components/parameters/AgentId'
+        - $ref: "#/components/parameters/AgentId"
       responses:
-        '200':
+        "200":
           description: Agent details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Agent'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: "#/components/schemas/Agent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    patch:
+      tags:
+        - agents
+      summary: Update agent
+      description: Update agent properties (name, version, promptTemplate, metadata)
+      operationId: updateAgent
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentRequest"
+            example:
+              name: updated-agent
+              version: v2.0
+              promptTemplate: "New prompt template with {{objective}}"
+      responses:
+        "200":
+          description: Agent updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Agent with this name and version already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Agent with this name and version already exists
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
     delete:
       tags:
         - agents
       summary: Delete agent
-      description: Delete a specific agent (must not be active)
+      description: Delete an inactive agent (cannot delete active agents)
       operationId: deleteAgent
       parameters:
-        - $ref: '#/components/parameters/AgentId'
+        - $ref: "#/components/parameters/AgentId"
       responses:
-        '204':
+        "204":
           description: Agent deleted successfully
-        '400':
+        "400":
           description: Cannot delete active agent
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Cannot delete active agent. Activate another version first.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/agents/{id}/activate:
     post:
@@ -532,7 +581,7 @@ paths:
       description: Activate an agent and deactivate other versions with the same name
       operationId: activateAgent
       parameters:
-        - $ref: '#/components/parameters/AgentId'
+        - $ref: "#/components/parameters/AgentId"
       requestBody:
         required: false
         content:
@@ -542,18 +591,18 @@ paths:
               additionalProperties: false
             example: {}
       responses:
-        '200':
+        "200":
           description: Agent activated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Agent'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: "#/components/schemas/Agent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/agents/resolve/{name}:
     get:
@@ -570,22 +619,22 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Active agent found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Agent'
-        '404':
+                $ref: "#/components/schemas/Agent"
+        "404":
           description: No active agent found with this name
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
 components:
   securitySchemes:
@@ -632,7 +681,7 @@ components:
       required: false
       description: Filter goals by status
       schema:
-        $ref: '#/components/schemas/GoalStatus'
+        $ref: "#/components/schemas/GoalStatus"
 
     RunStatusQuery:
       name: status
@@ -640,7 +689,7 @@ components:
       required: false
       description: Filter runs by status
       schema:
-        $ref: '#/components/schemas/RunStatus'
+        $ref: "#/components/schemas/RunStatus"
 
   schemas:
     GoalStatus:
@@ -719,29 +768,35 @@ components:
         objective:
           type: string
           minLength: 10
-          maxLength: 1000
+          maxLength: 10000
           description: The goal objective description
           example: Monitor GitHub repository for new issues
         params:
-          $ref: '#/components/schemas/GoalParams'
+          $ref: "#/components/schemas/GoalParams"
         webhookUrl:
           type: string
           format: uri
           nullable: true
           description: Optional webhook URL for notifications
           example: https://example.com/webhook
+        agentId:
+          type: string
+          pattern: ^agent_[a-z0-9]+$
+          nullable: true
+          description: ID of the agent assigned to this goal
+          example: agent_abc123
         status:
-          $ref: '#/components/schemas/GoalStatus'
+          $ref: "#/components/schemas/GoalStatus"
         createdAt:
           type: string
           format: date-time
           description: ISO 8601 timestamp
-          example: '2025-10-30T10:30:00.000Z'
+          example: "2025-10-30T10:30:00.000Z"
         updatedAt:
           type: string
           format: date-time
           description: ISO 8601 timestamp
-          example: '2025-10-30T10:30:00.000Z'
+          example: "2025-10-30T10:30:00.000Z"
 
     Schedule:
       type: object
@@ -780,11 +835,11 @@ components:
           type: string
           format: date-time
           description: ISO 8601 timestamp
-          example: '2025-10-30T10:30:00.000Z'
+          example: "2025-10-30T10:30:00.000Z"
 
     GoalWithSchedules:
       allOf:
-        - $ref: '#/components/schemas/Goal'
+        - $ref: "#/components/schemas/Goal"
         - type: object
           required:
             - schedules
@@ -792,7 +847,7 @@ components:
             schedules:
               type: array
               items:
-                $ref: '#/components/schemas/Schedule'
+                $ref: "#/components/schemas/Schedule"
               description: Associated schedules
 
     Run:
@@ -817,25 +872,25 @@ components:
           description: Associated goal ID
           example: goal_abc123
         status:
-          $ref: '#/components/schemas/RunStatus'
+          $ref: "#/components/schemas/RunStatus"
         startedAt:
           type: string
           format: date-time
           nullable: true
           description: ISO 8601 timestamp
-          example: '2025-10-30T10:30:00.000Z'
+          example: "2025-10-30T10:30:00.000Z"
         endedAt:
           type: string
           format: date-time
           nullable: true
           description: ISO 8601 timestamp
-          example: '2025-10-30T10:35:00.000Z'
+          example: "2025-10-30T10:35:00.000Z"
         workingMemory:
           type: object
           additionalProperties: true
           description: Agent's working memory during execution
           example:
-            lastChecked: '2025-10-30T10:30:00.000Z'
+            lastChecked: "2025-10-30T10:30:00.000Z"
         stepBudget:
           type: integer
           minimum: 1
@@ -855,17 +910,17 @@ components:
           type: string
           format: date-time
           description: ISO 8601 timestamp
-          example: '2025-10-30T10:30:00.000Z'
+          example: "2025-10-30T10:30:00.000Z"
 
     RunWithGoal:
       allOf:
-        - $ref: '#/components/schemas/Run'
+        - $ref: "#/components/schemas/Run"
         - type: object
           required:
             - goal
           properties:
             goal:
-              $ref: '#/components/schemas/Goal'
+              $ref: "#/components/schemas/Goal"
 
     Step:
       type: object
@@ -927,7 +982,7 @@ components:
           type: string
           format: date-time
           description: ISO 8601 timestamp
-          example: '2025-10-30T10:30:00.000Z'
+          example: "2025-10-30T10:30:00.000Z"
 
     Agent:
       type: object
@@ -958,6 +1013,14 @@ components:
           type: string
           description: Agent prompt template
           example: You are a helpful assistant that...
+        provider:
+          type: string
+          description: LLM provider for this agent
+          example: openai
+        model:
+          type: string
+          description: LLM model for this agent
+          example: gpt-4o
         active:
           type: boolean
           description: Whether this agent version is active
@@ -971,12 +1034,12 @@ components:
           type: string
           format: date-time
           description: ISO 8601 timestamp
-          example: '2025-10-30T10:30:00.000Z'
+          example: "2025-10-30T10:30:00.000Z"
         updatedAt:
           type: string
           format: date-time
           description: ISO 8601 timestamp
-          example: '2025-10-30T10:30:00.000Z'
+          example: "2025-10-30T10:30:00.000Z"
 
     CreateAgentRequest:
       type: object
@@ -1000,6 +1063,47 @@ components:
           minLength: 1
           description: Agent prompt template
           example: You are a helpful assistant that...
+        provider:
+          type: string
+          description: LLM provider for this agent
+          example: openai
+        model:
+          type: string
+          description: LLM model for this agent
+          example: gpt-4o
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional agent metadata
+          example: {}
+      additionalProperties: false
+
+    UpdateAgentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Agent name
+          example: defaultAgent
+        version:
+          type: string
+          minLength: 1
+          description: Agent version
+          example: 1.0.0
+        promptTemplate:
+          type: string
+          minLength: 1
+          description: Agent prompt template
+          example: You are a helpful assistant that...
+        provider:
+          type: string
+          description: LLM provider for this agent
+          example: openai
+        model:
+          type: string
+          description: LLM model for this agent
+          example: gpt-4o
         metadata:
           type: object
           additionalProperties: true
@@ -1015,16 +1119,25 @@ components:
         objective:
           type: string
           minLength: 10
-          maxLength: 1000
+          maxLength: 10000
           description: The goal objective description
           example: Monitor GitHub repository for new issues
         params:
-          $ref: '#/components/schemas/GoalParams'
+          $ref: "#/components/schemas/GoalParams"
         webhookUrl:
           type: string
           format: uri
           description: Optional webhook URL for notifications
           example: https://example.com/webhook
+        agentName:
+          type: string
+          description: Optional agent name to use for this goal (uses active version)
+          example: defaultAgent
+        agentId:
+          type: string
+          pattern: ^agent_[a-z0-9]+$
+          description: Optional specific agent ID to use for this goal
+          example: agent_abc123
         schedule:
           type: object
           required:
@@ -1048,11 +1161,11 @@ components:
         objective:
           type: string
           minLength: 10
-          maxLength: 1000
+          maxLength: 10000
           description: Updated goal objective
           example: Updated objective text
         params:
-          $ref: '#/components/schemas/GoalParams'
+          $ref: "#/components/schemas/GoalParams"
         webhookUrl:
           type: string
           format: uri
@@ -1060,7 +1173,7 @@ components:
           description: Updated webhook URL
           example: https://example.com/webhook
         status:
-          $ref: '#/components/schemas/GoalStatus'
+          $ref: "#/components/schemas/GoalStatus"
       additionalProperties: false
 
     HealthResponse:
@@ -1077,7 +1190,7 @@ components:
         timestamp:
           type: string
           format: date-time
-          example: '2025-10-30T10:30:00.000Z'
+          example: "2025-10-30T10:30:00.000Z"
 
     ReadinessResponse:
       type: object
@@ -1114,7 +1227,7 @@ components:
         timestamp:
           type: string
           format: date-time
-          example: '2025-10-30T10:30:00.000Z'
+          example: "2025-10-30T10:30:00.000Z"
 
     TriggerRunResponse:
       type: object
@@ -1156,7 +1269,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
           example:
             error: Invalid request parameters
 
@@ -1165,7 +1278,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
           example:
             error: Resource not found
 
@@ -1174,7 +1287,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
           example:
             error: Rate limit exceeded. Maximum 100 requests per minute.
 
@@ -1183,6 +1296,6 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
           example:
             error: Internal server error
