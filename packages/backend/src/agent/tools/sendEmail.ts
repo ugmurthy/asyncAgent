@@ -109,7 +109,7 @@ export class SendEmailTool extends BaseTool<SendEmailInput, SendEmailOutput> {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      ctx.logger.error('Email send failed:', error);
+      ctx.logger.error({ err: error }, 'Email send failed');
 
       return {
         success: false,

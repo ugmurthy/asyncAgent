@@ -68,7 +68,7 @@ export class WriteFileTool extends BaseTool<WriteFileInput, WriteFileOutput> {
         mode: input.mode,
       };
     } catch (error) {
-      ctx.logger.error('File write failed:', error);
+      ctx.logger.error({ err: error }, 'File write failed');
       throw error;
     }
   }

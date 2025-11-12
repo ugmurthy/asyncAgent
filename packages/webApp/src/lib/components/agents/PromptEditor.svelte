@@ -12,7 +12,8 @@
 		{ name: 'tools', description: 'Available tools list' },
 		{ name: 'stepBudget', description: 'Maximum steps allowed' },
 		{ name: 'workingMemory', description: 'Current working memory state' },
-		{ name: 'constraints', description: 'Any additional constraints' }
+		{ name: 'constraints', description: 'Any additional constraints' },
+		{ name: 'CurrentDate', description: 'Current date and time' }
 	];
 	
 	// Detect which placeholders are used in the template
@@ -121,6 +122,8 @@
 					.replace(/\{\{ workingMemory \}\}/g, '<memory state>')
 					.replace(/\{\{constraints\}\}/g, '<constraints>')
 					.replace(/\{\{ constraints \}\}/g, '<constraints>')
+					.replace(/\{\{CurrentDate\}\}/g, new Date().toLocaleString())
+					.replace(/\{\{ CurrentDate \}\}/g, new Date().toLocaleString())
 				}</pre>
 			</div>
 		</Card.Content>

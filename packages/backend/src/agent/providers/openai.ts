@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { LLMProvider, LLMCallParams, LLMResponse } from '@async-agent/shared';
+import type { LLMProvider, LLMCallParams, LLMResponse, ChatParams, ChatResponse } from '@async-agent/shared';
 import { validateOpenAIModel } from './validator.js';
 import { logger } from '../../util/logger.js';
 
@@ -7,14 +7,33 @@ export class OpenAIProvider implements LLMProvider {
   name = 'openai';
   private client: OpenAI;
   private model: string;
+  private defaultMaxTokens: number;
 
-  constructor(apiKey: string, model: string) {
+  constructor(apiKey: string, model: string, defaultMaxTokens: number) {
     this.client = new OpenAI({ apiKey });
     this.model = model;
+    this.defaultMaxTokens = defaultMaxTokens;
   }
 
   async validateToolCallSupport(model: string): Promise<{ supported: boolean; message?: string }> {
     return validateOpenAIModel(model);
+  }
+
+  async chat(params: ChatParams): Promise<ChatResponse> {
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: params.messages as any,
+        temperature: params.temperature ?? 0.7,
+        max_tokens: params.maxTokens ?? this.defaultMaxTokens,
+      });
+
+      const content = response.choices[0].message.content || '';
+      return { content };
+    } catch (error) {
+      logger.error({ err: error }, 'OpenAI chat call failed');
+      throw error;
+    }
   }
 
   async callWithTools(params: LLMCallParams): Promise<LLMResponse> {
@@ -24,8 +43,8 @@ export class OpenAIProvider implements LLMProvider {
         messages: params.messages as any,
         tools: params.tools as any,
         temperature: params.temperature ?? 0.7,
-        max_tokens: params.maxTokens ?? 2000,
-        
+        max_tokens: params.maxTokens ?? this.defaultMaxTokens,
+
       });
 
       const choice = response.choices[0];
@@ -43,7 +62,7 @@ export class OpenAIProvider implements LLMProvider {
         finishReason: this.mapFinishReason(choice.finish_reason),
       };
     } catch (error) {
-      logger.error('OpenAI API call failed:', error);
+      logger.error({ err: error }, 'OpenAI API call failed');
       throw error;
     }
   }

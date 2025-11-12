@@ -42,7 +42,7 @@ export class WebSearchTool extends BaseTool<WebSearchInput, SearchResult[]> {
       ctx.logger.info(`Found ${results.length} search results`);
       return results;
     } catch (error) {
-      ctx.logger.error('Web search failed:', error);
+      ctx.logger.error({ err: error }, 'Web search failed');
       throw error;
     }
   }

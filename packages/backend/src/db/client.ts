@@ -55,7 +55,7 @@ export function runMigrations() {
     migrate(db, { migrationsFolder: './src/db/migrations' });
     logger.info('Migrations completed successfully');
   } catch (error) {
-    logger.error('Migration failed:', error);
+    logger.error({ err: error }, 'Migration failed');
     throw error;
   }
 }

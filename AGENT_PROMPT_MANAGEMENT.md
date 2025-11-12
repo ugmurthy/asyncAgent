@@ -108,6 +108,7 @@ Prompt templates support the following placeholders:
 | `{{toolsList}}` | Available tools formatted as list | "- webSearch: Search the web\n- fileWrite: Write to file" |
 | `{{stepsRemaining}}` | Number of steps left in budget | "10" |
 | `{{workingMemory}}` | JSON serialized working memory | '{"lastAction": "searched web", ...}' |
+| `{{currentDate}}` | Current local date and time | "11/7/2025, 12:34:56 PM" |
 
 ## Usage Examples
 

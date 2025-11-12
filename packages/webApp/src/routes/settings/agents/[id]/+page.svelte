@@ -287,7 +287,7 @@
 					<Card.Header>
 						<Card.Title>Prompt Template</Card.Title>
 						<Card.Description>
-							Use placeholders like &#123;&#123;objective&#125;&#125;, &#123;&#123;tools&#125;&#125;, &#123;&#123;stepBudget&#125;&#125;, etc.
+							Use placeholders like &#123;&#123;objective&#125;&#125;, &#123;&#123;tools&#125;&#125;, &#123;&#123;stepBudget&#125;&#125;, &#123;&#123;CurrentDate&#125;&#125;, etc.
 						</Card.Description>
 					</Card.Header>
 					<Card.Content>

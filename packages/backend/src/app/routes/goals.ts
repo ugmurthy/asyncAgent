@@ -4,6 +4,61 @@ import { goals, schedules, agents } from '../../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import type { CronScheduler } from '../../scheduler/cron.js';
 import { env } from '../../util/env.js';
+import type { DrizzleDB } from '../../db/index.js';
+
+type ResolveAgentResult = 
+  | { success: true; agentId: string | undefined }
+  | { success: false; error: string };
+
+async function resolveAgentId(
+  db: DrizzleDB,
+  body: { agentName?: string; agentId?: string }
+): Promise<ResolveAgentResult> {
+  if ('agentName' in body && body.agentName) {
+    const agent = await db.query.agents.findFirst({
+      where: and(
+        eq(agents.name, body.agentName),
+        eq(agents.active, true)
+      ),
+    });
+    
+    if (!agent) {
+      return { 
+        success: false, 
+        error: `No active agent found with name: ${body.agentName}` 
+      };
+    }
+    
+    return { success: true, agentId: agent.id };
+  }
+  
+  if ('agentId' in body && body.agentId) {
+    const agent = await db.query.agents.findFirst({
+      where: eq(agents.id, body.agentId),
+    });
+    
+    if (!agent) {
+      return { 
+        success: false, 
+        error: `Agent not found with id: ${body.agentId}` 
+      };
+    }
+    
+    return { success: true, agentId: agent.id };
+  }
+  
+  const defaultAgent = await db.query.agents.findFirst({
+    where: and(
+      eq(agents.name, 'defaultAgent'),
+      eq(agents.active, true)
+    ),
+  });
+  
+  return { 
+    success: true, 
+    agentId: defaultAgent?.id 
+  };
+}
 
 const createGoalSchema = createGoalSchemaFactory(parseInt(env.MAX_MESSAGE_LENGTH, 10));
 const updateGoalSchema = updateGoalSchemaFactory(parseInt(env.MAX_MESSAGE_LENGTH, 10));
@@ -18,47 +73,11 @@ export async function goalsRoutes(
   fastify.post('/goals', async (request, reply) => {
     const body = createGoalSchema.parse(request.body);
 
-    let agentId: string | undefined;
-    
-    if ('agentName' in body && body.agentName) {
-      const agent = await db.query.agents.findFirst({
-        where: and(
-          eq(agents.name, body.agentName),
-          eq(agents.active, true)
-        ),
-      });
-      
-      if (!agent) {
-        return reply.code(400).send({ 
-          error: `No active agent found with name: ${body.agentName}` 
-        });
-      }
-      
-      agentId = agent.id;
-    } else if ('agentId' in body && body.agentId) {
-      const agent = await db.query.agents.findFirst({
-        where: eq(agents.id, body.agentId),
-      });
-      
-      if (!agent) {
-        return reply.code(400).send({ 
-          error: `Agent not found with id: ${body.agentId}` 
-        });
-      }
-      
-      agentId = agent.id;
-    } else {
-      const defaultAgent = await db.query.agents.findFirst({
-        where: and(
-          eq(agents.name, 'defaultAgent'),
-          eq(agents.active, true)
-        ),
-      });
-      
-      if (defaultAgent) {
-        agentId = defaultAgent.id;
-      }
+    const result = await resolveAgentId(db, body);
+    if (!result.success) {
+      return reply.code(400).send({ error: result.error });
     }
+    const agentId = result.agentId;
 
     const goalId = generateGoalId();
     
@@ -114,12 +133,14 @@ export async function goalsRoutes(
           orderBy: (goals, { desc }) => [desc(goals.createdAt)],
           with: {
             schedules: true,
+            agent: true,
           },
         })
       : await db.query.goals.findMany({
           orderBy: (goals, { desc }) => [desc(goals.createdAt)],
           with: {
             schedules: true,
+            agent: true,
           },
         });
 

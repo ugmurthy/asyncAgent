@@ -26,6 +26,9 @@ pnpm --filter backend dev
 
 # Run CLI in dev mode
 pnpm --filter cli dev
+
+# List environment variables
+pnpm --filter backend exec tsx scripts/list-env.mjs
 ```
 
 ### Database

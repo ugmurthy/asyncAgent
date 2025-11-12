@@ -25,9 +25,23 @@ export interface LLMResponse {
   reasoning?: string;
 }
 
+export interface ChatParams {
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }>;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface ChatResponse {
+  content: string;
+}
+
 export interface LLMProvider {
   name: string;
   callWithTools(params: LLMCallParams): Promise<LLMResponse>;
+  chat(params: ChatParams): Promise<ChatResponse>;
   validateToolCallSupport(model: string): Promise<{ 
     supported: boolean; 
     message?: string 

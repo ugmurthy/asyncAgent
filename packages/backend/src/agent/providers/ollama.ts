@@ -1,5 +1,5 @@
 import { Ollama } from 'ollama';
-import type { LLMProvider, LLMCallParams, LLMResponse } from '@async-agent/shared';
+import type { LLMProvider, LLMCallParams, LLMResponse, ChatParams, ChatResponse } from '@async-agent/shared';
 import { validateOllamaModel } from './validator.js';
 import { logger } from '../../util/logger.js';
 
@@ -7,10 +7,12 @@ export class OllamaProvider implements LLMProvider {
   name = 'ollama';
   private client: Ollama;
   private model: string;
+  private defaultMaxTokens: number;
 
-  constructor(baseUrl: string, model: string) {
+  constructor(baseUrl: string, model: string, defaultMaxTokens: number) {
     this.client = new Ollama({ host: baseUrl });
     this.model = model;
+    this.defaultMaxTokens = defaultMaxTokens;
   }
 
   async validateToolCallSupport(model: string): Promise<{ supported: boolean; message?: string }> {
@@ -72,6 +74,27 @@ export class OllamaProvider implements LLMProvider {
     }
   }
 
+  async chat(params: ChatParams): Promise<ChatResponse> {
+    try {
+      const response = await this.client.chat({
+        model: this.model,
+        messages: params.messages.map(m => ({
+          role: m.role as any,
+          content: m.content,
+        })),
+        options: {
+          temperature: params.temperature ?? 0.7,
+          num_predict: params.maxTokens ?? this.defaultMaxTokens,
+        },
+      });
+
+      return { content: response.message.content || '' };
+    } catch (error) {
+      logger.error({ err: error }, 'Ollama chat call failed');
+      throw error;
+    }
+  }
+
   async callWithTools(params: LLMCallParams): Promise<LLMResponse> {
     try {
       const response = await this.client.chat({
@@ -90,7 +113,7 @@ export class OllamaProvider implements LLMProvider {
         })),
         options: {
           temperature: params.temperature ?? 0.7,
-          num_predict: params.maxTokens ?? 2000,
+          num_predict: params.maxTokens ?? this.defaultMaxTokens,
         },
       });
 
@@ -106,7 +129,7 @@ export class OllamaProvider implements LLMProvider {
         finishReason: toolCalls && toolCalls.length > 0 ? 'tool_calls' : 'stop',
       };
     } catch (error) {
-      logger.error('Ollama API call failed:', error);
+      logger.error({ err: error }, 'Ollama API call failed');
       throw error;
     }
   }

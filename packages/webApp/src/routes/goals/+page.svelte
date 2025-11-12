@@ -153,9 +153,9 @@
 					<Table.Row>
 						<Table.Head>Status</Table.Head>
 						<Table.Head>Objective</Table.Head>
+						<Table.Head>Agent</Table.Head>
 						<Table.Head>Schedule</Table.Head>
 						<Table.Head>Created</Table.Head>
-						<Table.Head>Updated</Table.Head>
 						<Table.Head class="text-right">Actions</Table.Head>
 					</Table.Row>
 				</Table.Header>
@@ -172,17 +172,17 @@
 							</Table.Cell>
 							<Table.Cell>
 								<span class="text-sm text-muted-foreground">
+									{goal.agent?.name || 'N/A'}
+								</span>
+							</Table.Cell>
+							<Table.Cell>
+								<span class="text-sm text-muted-foreground">
 									{getScheduleDisplay(goal)}
 								</span>
 							</Table.Cell>
 							<Table.Cell>
 								<span class="text-sm text-muted-foreground" title={formatDate(goal.createdAt)}>
 									{formatRelativeTime(goal.createdAt)}
-								</span>
-							</Table.Cell>
-							<Table.Cell>
-								<span class="text-sm text-muted-foreground" title={formatDate(goal.updatedAt)}>
-									{formatRelativeTime(goal.updatedAt)}
 								</span>
 							</Table.Cell>
 							<Table.Cell class="text-right">

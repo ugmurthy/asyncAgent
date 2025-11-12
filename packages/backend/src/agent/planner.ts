@@ -70,7 +70,7 @@ export class AgentPlanner {
         shouldFinish,
       };
     } catch (error) {
-      this.logger.error('Planning failed:', error);
+      this.logger.error({ err: error }, 'Planning failed');
       throw error;
     }
   }
@@ -88,43 +88,47 @@ export class AgentPlanner {
         : context.constraints
       : '';
     
+    const currentDate = new Date().toLocaleString();
+
     this.logger.debug('Prompt template placeholder values:', {
       usingCustomTemplate: !!this.promptTemplate,
       objective: context.objective,
       toolsList,
       stepsRemaining: context.stepsRemaining,
-      workingMemory,
-      constraints: constraintsText,
+    workingMemory,
+    constraints: constraintsText,
+    currentDate,
     });
-    
+
     if (this.promptTemplate) {
       // Check for unknown placeholders
-      const knownPlaceholders = ['objective', 'toolsList', 'stepsRemaining', 'workingMemory', 'constraints'];
+      const knownPlaceholders = ['objective', 'toolsList', 'stepsRemaining', 'workingMemory', 'constraints', 'currentDate'];
       const placeholderPattern = /\{\{(\w+)\}\}/g;
       const foundPlaceholders = new Set<string>();
       let match;
-      
+
       while ((match = placeholderPattern.exec(this.promptTemplate)) !== null) {
-        foundPlaceholders.add(match[1]);
+      foundPlaceholders.add(match[1]);
       }
-      
+
       const unknownPlaceholders = Array.from(foundPlaceholders).filter(
-        p => !knownPlaceholders.includes(p)
+      p => !knownPlaceholders.includes(p)
       );
-      
+
       if (unknownPlaceholders.length > 0) {
         this.logger.warn('Unknown placeholders found in prompt template:', {
-          unknownPlaceholders,
-          knownPlaceholders,
-        });
+      unknownPlaceholders,
+      knownPlaceholders,
+      });
       }
-      
+
       return this.promptTemplate
         .replace(/\{\{objective\}\}/g, context.objective)
         .replace(/\{\{toolsList\}\}/g, toolsList)
-        .replace(/\{\{stepsRemaining\}\}/g, String(context.stepsRemaining))
-        .replace(/\{\{workingMemory\}\}/g, workingMemory)
-        .replace(/\{\{constraints\}\}/g, constraintsText);
+      .replace(/\{\{stepsRemaining\}\}/g, String(context.stepsRemaining))
+      .replace(/\{\{workingMemory\}\}/g, workingMemory)
+      .replace(/\{\{constraints\}\}/g, constraintsText)
+      .replace(/\{\{currentDate\}\}/g, currentDate);
     }
     
     const constraintsSection = constraintsText
@@ -201,7 +205,7 @@ Provide a clear, concise summary of what was accomplished and any key findings o
 
       return response.thought;
     } catch (error) {
-      this.logger.error('Summary generation failed:', error);
+      this.logger.error({ err: error }, 'Summary generation failed');
       return 'Summary generation failed. See execution history for details.';
     }
   }

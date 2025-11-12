@@ -79,8 +79,8 @@ export class FetchPageTool extends BaseTool<FetchPageInput, FetchPageOutput> {
         truncated,
       };
     } catch (error) {
-      ctx.logger.error('Page fetch failed:', error);
-      throw error;
+      ctx.logger.error({ err: error }, 'Page fetch failed');
+      //throw error;
     }
   }
 

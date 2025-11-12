@@ -72,7 +72,7 @@ export class SendWebhookTool extends BaseTool<SendWebhookInput, SendWebhookOutpu
         response: responseData,
       };
     } catch (error) {
-      ctx.logger.error('Webhook send failed:', error);
+      ctx.logger.error({ err: error }, 'Webhook send failed');
       throw error;
     }
   }

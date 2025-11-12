@@ -1,13 +1,14 @@
 import OpenAI from 'openai';
-import type { LLMProvider, LLMCallParams, LLMResponse } from '@async-agent/shared';
+import type { LLMProvider, LLMCallParams, LLMResponse, ChatParams, ChatResponse } from '@async-agent/shared';
 import { logger } from '../../util/logger.js';
 
 export class OpenRouterProvider implements LLMProvider {
   name = 'openrouter';
   private client: OpenAI;
   private model: string;
+  private defaultMaxTokens: number;
 
-  constructor(apiKey: string, model: string) {
+  constructor(apiKey: string, model: string, defaultMaxTokens: number) {
     this.client = new OpenAI({
       apiKey,
       baseURL: 'https://openrouter.ai/api/v1',
@@ -17,6 +18,7 @@ export class OpenRouterProvider implements LLMProvider {
       },
     });
     this.model = model;
+    this.defaultMaxTokens = defaultMaxTokens;
   }
 
   async validateToolCallSupport(model: string): Promise<{ supported: boolean; message?: string }> {
@@ -49,11 +51,29 @@ export class OpenRouterProvider implements LLMProvider {
       // Assume tool calling is supported for most modern models
       return { supported: true };
     } catch (error) {
-      logger.warn('OpenRouter validation check failed, proceeding anyway:', error);
+      logger.warn({ err: error }, 'OpenRouter validation check failed, proceeding anyway');
       return { 
         supported: true,
         message: 'Could not verify model, proceeding with assumption of tool support',
       };
+    }
+  }
+
+  async chat(params: ChatParams): Promise<ChatResponse> {
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: params.messages as any,
+        temperature: params.temperature ?? 0.7,
+        max_tokens: params.maxTokens ?? this.defaultMaxTokens,
+        reasoning_effort:"medium"
+      });
+
+      const content = response.choices[0].message.content || '';
+      return { content };
+    } catch (error) {
+      logger.error({ err: error }, 'OpenRouter chat call failed');
+      throw error;
     }
   }
 
@@ -68,14 +88,15 @@ export class OpenRouterProvider implements LLMProvider {
         messages: params.messages as any,
         tools: params.tools as any,
         temperature: params.temperature ?? 0.7,
-        max_tokens: params.maxTokens ?? 2000,
+        max_tokens: params.maxTokens ?? this.defaultMaxTokens,
+        reasoning_effort: "medium" ,
       });
       logger.debug(`call_with_tools : ${JSON.stringify({
         model: this.model,
         messages: params.messages as any,
         tools: params.tools as any,
         temperature: params.temperature ?? 0.7,
-        max_tokens: params.maxTokens ?? 2000,
+        max_tokens: params.maxTokens ?? this.defaultMaxTokens,
       },null,2)}`)
 
       const choice = response.choices[0];
@@ -99,7 +120,7 @@ export class OpenRouterProvider implements LLMProvider {
         finishReason: this.mapFinishReason(choice.finish_reason),
       };
     } catch (error) {
-      logger.error('OpenRouter API call failed:', error);
+      logger.error({ err: error }, 'OpenRouter API call failed');
       throw error;
     }
   }

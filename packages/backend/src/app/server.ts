@@ -11,6 +11,8 @@ import { CronScheduler } from '../scheduler/cron.js';
 import { goalsRoutes } from './routes/goals.js';
 import { runsRoutes } from './routes/runs.js';
 import { agentsRoutes } from './routes/agents.js';
+import { dagRoutes } from './routes/dag.js';
+import { toolsRoutes } from './routes/tools.js';
 import { seedDefaultAgent } from '../db/seed.js';
 
 const fastify = Fastify({
@@ -21,7 +23,11 @@ const fastify = Fastify({
 fastify.decorate('db', db);
 
 // Register plugins
-await fastify.register(cors);
+await fastify.register(cors, {
+  origin: ['https://local.drizzle.studio','http://localhost:5174','http://localhost:5173'],
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+});
 await fastify.register(rateLimit, {
   max: 100,
   timeWindow: '1 minute',
@@ -58,6 +64,8 @@ fastify.get('/health/ready', async () => {
 await fastify.register(agentsRoutes, { prefix: '/api/v1' });
 await fastify.register(goalsRoutes, { prefix: '/api/v1', scheduler });
 await fastify.register(runsRoutes, { prefix: '/api/v1' });
+await fastify.register(dagRoutes, { prefix: '/api/v1', llmProvider, toolRegistry: defaultToolRegistry });
+await fastify.register(toolsRoutes, { prefix: '/api/v1', toolRegistry: defaultToolRegistry });
 
 // Start server
 const start = async () => {
@@ -76,7 +84,7 @@ const start = async () => {
     logger.info(`LLM Provider: ${env.LLM_PROVIDER} (${env.LLM_MODEL})`);
     logger.info(`Scheduler: ${scheduler.getStats().activeSchedules} active schedules`);
   } catch (err) {
-    logger.error(err);
+    logger.error({ err }, 'Failed to start server');
     process.exit(1);
   }
 };

@@ -1,6 +1,7 @@
 import type { Tool } from '@async-agent/shared';
 import { WebSearchTool } from './webSearch.js';
 import { FetchPageTool } from './fetchPage.js';
+import { FetchURLsTool } from './fetchURLs.js';
 import { WriteFileTool } from './writeFile.js';
 import { ReadFileTool } from './readFile.js';
 import { SendWebhookTool } from './sendWebhook.js';
@@ -16,6 +17,7 @@ export class ToolRegistry {
   private registerDefaultTools() {
     this.register(new WebSearchTool());
     this.register(new FetchPageTool());
+    this.register(new FetchURLsTool());
     this.register(new WriteFileTool());
     this.register(new ReadFileTool());
     this.register(new SendWebhookTool());
@@ -57,6 +59,7 @@ export const defaultToolRegistry = new ToolRegistry();
 export * from './base.js';
 export * from './webSearch.js';
 export * from './fetchPage.js';
+export * from './fetchURLs.js';
 export * from './writeFile.js';
 export * from './readFile.js';
 export * from './sendWebhook.js';

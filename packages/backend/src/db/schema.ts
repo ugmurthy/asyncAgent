@@ -101,10 +101,14 @@ export type Agent = typeof agents.$inferSelect;
 export type NewAgent = typeof agents.$inferInsert;
 
 // Relations
-export const goalsRelations = relations(goals, ({ many }) => ({
+export const goalsRelations = relations(goals, ({ one, many }) => ({
   schedules: many(schedules),
   runs: many(runs),
   memories: many(memories),
+  agent: one(agents, {
+    fields: [goals.agentId],
+    references: [agents.id],
+  }),
 }));
 
 export const schedulesRelations = relations(schedules, ({ one }) => ({

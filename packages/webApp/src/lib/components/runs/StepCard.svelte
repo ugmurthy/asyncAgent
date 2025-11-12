@@ -63,7 +63,9 @@
   {#if step.thought}
     <div class="text-sm">
       <span class="text-muted-foreground font-medium block mb-1">Thought:</span>
-      <div class="text-sm bg-muted/50 p-2 rounded prose prose-sm max-w-none dark:prose-invert">
+      <div
+        class="text-sm bg-muted/50 p-2 rounded prose prose-sm max-w-none dark:prose-invert"
+      >
         <SvelteMarkdown source={step.thought} />
       </div>
     </div>

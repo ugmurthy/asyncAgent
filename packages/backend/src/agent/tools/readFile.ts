@@ -53,7 +53,7 @@ export class ReadFileTool extends BaseTool<ReadFileInput, ReadFileOutput> {
         truncated,
       };
     } catch (error) {
-      ctx.logger.error('File read failed:', error);
+      ctx.logger.error({ err: error }, 'File read failed');
       throw error;
     }
   }

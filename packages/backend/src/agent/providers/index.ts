@@ -17,7 +17,7 @@ export function createLLMProvider(config?: ProviderConfig): LLMProvider {
         throw new Error('OPENAI_API_KEY is required for OpenAI provider');
       }
       
-      return new OpenAIProvider(apiKey, model);
+      return new OpenAIProvider(apiKey, model, parseInt(env.DEFAULT_MAX_TOKENS));
     }
 
     case 'openrouter': {
@@ -28,14 +28,14 @@ export function createLLMProvider(config?: ProviderConfig): LLMProvider {
         throw new Error('OPENROUTER_API_KEY is required for OpenRouter provider');
       }
       
-      return new OpenRouterProvider(apiKey, model);
+      return new OpenRouterProvider(apiKey, model, parseInt(env.DEFAULT_MAX_TOKENS));
     }
 
     case 'ollama': {
       const baseUrl = config?.baseUrl || env.OLLAMA_BASE_URL;
       const model = config?.model || env.OLLAMA_MODEL || env.LLM_MODEL;
       
-      return new OllamaProvider(baseUrl, model);
+      return new OllamaProvider(baseUrl, model, parseInt(env.DEFAULT_MAX_TOKENS));
     }
 
     default:

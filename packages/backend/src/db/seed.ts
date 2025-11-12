@@ -54,7 +54,7 @@ export async function seedDefaultAgent(): Promise<void> {
 
     logger.info('Default agent created successfully');
   } catch (error) {
-    logger.error('Failed to seed default agent:', error);
+    logger.error({ err: error }, 'Failed to seed default agent');
     throw error;
   }
 }

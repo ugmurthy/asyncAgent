@@ -28,7 +28,7 @@ export class TaskQueue {
     });
 
     this.queue.on('error', (error) => {
-      this.logger.error('Queue error:', error);
+      this.logger.error({ err: error }, 'Queue error');
     });
   }
 
@@ -43,7 +43,7 @@ export class TaskQueue {
           this.logger.info(`Task completed: ${task.id}`);
           return result;
         } catch (error) {
-          this.logger.error(`Task failed: ${task.id}`, error);
+          this.logger.error({ err: error, taskId: task.id }, `Task failed: ${task.id}`);
           throw error;
         }
       },

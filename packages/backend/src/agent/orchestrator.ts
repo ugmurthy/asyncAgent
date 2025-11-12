@@ -187,7 +187,7 @@ export class AgentOrchestrator {
                 ? result.reason.message 
                 : String(result.reason);
               errors.push(`[${toolCall.name}] Error: ${errorMsg}`);
-              logger.error(`Tool execution failed: ${toolCall.name}`, result.reason);
+              logger.error({ err: result.reason }, `Tool execution failed: ${toolCall.name}`);
             }
           });
 
@@ -268,7 +268,7 @@ export class AgentOrchestrator {
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error(`Run failed: ${runId}`, error);
+      logger.error({ err: error }, `Run failed: ${runId}`);
 
       // Mark run as failed
       await db.update(runs)
