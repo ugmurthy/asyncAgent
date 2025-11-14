@@ -1,6 +1,7 @@
 import type { LLMProvider, ProviderConfig } from '@async-agent/shared';
 import { OpenAIProvider } from './openai.js';
 import { OpenRouterProvider } from './openrouter.js';
+import { OpenRouterFetchProvider } from './openrouter-fetch.js';
 import { OllamaProvider } from './ollama.js';
 import { env } from '../../util/env.js';
 import { logger } from '../../util/logger.js';
@@ -29,6 +30,17 @@ export function createLLMProvider(config?: ProviderConfig): LLMProvider {
       }
       
       return new OpenRouterProvider(apiKey, model, parseInt(env.DEFAULT_MAX_TOKENS));
+    }
+
+    case 'openrouter-fetch': {
+      const apiKey = config?.apiKey || env.OPENROUTER_API_KEY;
+      const model = config?.model || env.OPENROUTER_MODEL || env.LLM_MODEL;
+      
+      if (!apiKey) {
+        throw new Error('OPENROUTER_API_KEY is required for OpenRouter Fetch provider');
+      }
+      
+      return new OpenRouterFetchProvider(apiKey, model, parseInt(env.DEFAULT_MAX_TOKENS));
     }
 
     case 'ollama': {
@@ -67,5 +79,6 @@ export async function validateLLMSetup(provider?: LLMProvider, model?: string): 
 
 export * from './openai.js';
 export * from './openrouter.js';
+export * from './openrouter-fetch.js';
 export * from './ollama.js';
 export * from './validator.js';

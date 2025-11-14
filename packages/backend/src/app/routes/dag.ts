@@ -78,6 +78,9 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         agentName: z.string().min(1),
         provider: z.string().optional(),
         model: z.string().optional(),
+        max_tokens: z.number().optional(),
+        temperature: z.number().optional(),
+        seed: z.number().optional(),
       });
 
       const body = inputSchema.parse(request.body);
@@ -97,6 +100,14 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
             provider: body.provider as 'openai' | 'openrouter' | 'ollama',
             model: body.model,
           });
+
+          // Validate tool call support
+          const validationResult = await activeLLMProvider.validateToolCallSupport(body.model);
+          if (!validationResult.supported) {
+            throw new Error(
+              `Model ${body.model} does not support tool calling. ${validationResult.message || ''}`
+            );
+          }
         } else {
           activeLLMProvider = llmProvider;
         }
@@ -131,7 +142,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       let showGoalText = goalText.length>50?`${goalText.slice(0,50)}...`:goalText;
       let attempt = 0;
       const maxAttempts = 3;
-      log.info({systemPrompt},'System Prompt')
+      //log.info({systemPrompt},'System Prompt')
 
       while (attempt < maxAttempts) {
         attempt++;
@@ -143,10 +154,9 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
             { role: 'system', content: systemPrompt },
             { role: 'user', content: currentGoalText },
           ],
-          tools: [],
-          temperature: 0.7,
-          maxTokens: 10000,
-          reasoning_effort : 'high',
+          temperature: body.temperature ?? 0.7,
+          maxTokens: body.max_tokens ?? 10000,
+          ...(body.seed !== undefined && { seed: body.seed }),
         });
 
         let result;
@@ -168,7 +178,8 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
           }
           continue;
         }
-
+        const usage = response?.usage
+        const generationId = response?.generationId
         const validatedResult = DecomposerJobSchema.safeParse(result);
         
         if (!validatedResult.success) {
@@ -195,6 +206,8 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
             status: 'clarification_required',
             clarification_query: dag.clarification_query,
             result: dag,
+            usage,
+            generationId
           });
         }
 
@@ -202,6 +215,8 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
           return reply.code(200).send({
             status: 'success',
             result: dag,
+            usage,
+            generationId,
             attempts: attempt,
           });
         }
@@ -217,6 +232,8 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         return reply.code(200).send({
           status: 'success',
           result: dag,
+          usage,
+          generationId,
           attempts: attempt,
         });
       }
@@ -286,6 +303,64 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       
       return reply.code(500).send({
         status: 'failed',
+        error: errorMessage,
+      });
+    }
+  });
+
+  fastify.post('/dag-experiments', async (request, reply) => {
+    try {
+      const inputSchema = z.object({
+        'goal-text': z.string().min(1),
+        models: z.array(z.string()).min(1),
+        temperatures: z.array(z.number().min(0).max(2)).min(1),
+        seed: z.number().int(),
+      });
+
+      const body = inputSchema.parse(request.body);
+      const { 'goal-text': goalText, models, temperatures, seed } = body;
+
+      log.info({ 
+        goalText, 
+        modelsCount: models.length, 
+        temperaturesCount: temperatures.length,
+        totalExperiments: models.length * temperatures.length 
+      }, 'Starting DAG experiments');
+
+      for (const model of models) {
+        for (const temperature of temperatures) {
+          const requestBody = {
+            'goal-text': goalText,
+            model,
+            temperature,
+            seed,
+          };
+
+          log.info({ requestBody }, 'DAG experiment request body');
+        }
+      }
+
+      return reply.code(200).send({
+        status: 'experiments_logged',
+        totalExperiments: models.length * temperatures.length,
+        models,
+        temperatures,
+        seed,
+      });
+
+    } catch (error) {
+      log.error({ err: error }, 'DAG experiments failed');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid input parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
         error: errorMessage,
       });
     }

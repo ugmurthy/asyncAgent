@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   // LLM Provider
-  LLM_PROVIDER: z.enum(['openai', 'openrouter', 'ollama']).default('openai'),
+  LLM_PROVIDER: z.enum(['openai', 'openrouter', 'ollama','openrouter-fetch']).default('openai'),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().optional(),
   OPENROUTER_API_KEY: z.string().optional(),

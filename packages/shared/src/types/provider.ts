@@ -1,6 +1,6 @@
 import type { ToolDefinition } from './tool.js';
 
-export type LLMProviderType = 'openai' | 'openrouter' | 'ollama';
+export type LLMProviderType = 'openai' | 'openrouter' | 'openrouter-fetch' | 'ollama';
 
 export interface LLMCallParams {
   messages: Array<{

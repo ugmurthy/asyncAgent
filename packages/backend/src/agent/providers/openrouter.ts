@@ -66,8 +66,15 @@ export class OpenRouterProvider implements LLMProvider {
         messages: params.messages as any,
         temperature: params.temperature ?? 0.7,
         max_tokens: params.maxTokens ?? this.defaultMaxTokens,
-        reasoning_effort:"medium"
+        reasoning_effort:params.reasoning_effort ?? "medium"
       });
+      logger.debug(`call_chat : ${JSON.stringify({
+        model: this.model,
+        tools: params.tools as any,
+        temperature: params.temperature ?? 0.7,
+        max_tokens: params.maxTokens ?? this.defaultMaxTokens,
+        reasoning_effort: params.reasoning_effort?? "medium"
+      },null,2)}`)
 
       const content = response.choices[0].message.content || '';
       return { content };
@@ -85,11 +92,10 @@ export class OpenRouterProvider implements LLMProvider {
       
       const response = await this.client.chat.completions.create({
         model: this.model,
-        messages: params.messages as any,
         tools: params.tools as any,
         temperature: params.temperature ?? 0.7,
         max_tokens: params.maxTokens ?? this.defaultMaxTokens,
-        reasoning_effort: "medium" ,
+        reasoning_effort: params.reasoning_effort?? "medium" ,
       });
       logger.debug(`call_with_tools : ${JSON.stringify({
         model: this.model,
@@ -97,6 +103,7 @@ export class OpenRouterProvider implements LLMProvider {
         tools: params.tools as any,
         temperature: params.temperature ?? 0.7,
         max_tokens: params.maxTokens ?? this.defaultMaxTokens,
+        reasoning_effort: params.reasoning_effort?? "medium"
       },null,2)}`)
 
       const choice = response.choices[0];

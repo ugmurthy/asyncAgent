@@ -44,6 +44,6 @@ coverage/
 .nyc_output/
 
 # Documents
-*.txt
-*.json
+data/
+mermaid/
 
