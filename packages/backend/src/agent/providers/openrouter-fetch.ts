@@ -107,9 +107,7 @@ function extractUsage(data: OpenAIChatCompletionResponse): {
   };
 }
 
-function extractGenerationId(data: OpenAIChatCompletionResponse): string {
-  return data.id;
-}
+
 
 async function fetchWithTimeout(
   url: string,
@@ -152,6 +150,55 @@ export class OpenRouterFetchProvider implements LLMProvider {
     this.apiKey = apiKey;
     this.model = model;
     this.defaultMaxTokens = defaultMaxTokens;
+  }
+
+  async extractGenerationId(data: OpenAIChatCompletionResponse, maxAttempts = 5, initialDelayMs = 500): Promise<any> {
+    const generationId = data.id;
+    logger.info({url:`${BASE_URL}/generation?id=${generationId}`}, 'Generation url')
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const delayMs = initialDelayMs * Math.pow(1.5, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        
+        const res = await fetch(
+          `${BASE_URL}/generation?id=${generationId}`,
+          { headers: buildHeaders(this.apiKey) }
+        );
+        
+        if (!res.ok) {
+          if (attempt === maxAttempts) {
+            logger.warn({ status: res.status, generationId, attempts: attempt }, 'Failed to fetch generation details after max attempts');
+            return { error: 'Failed to fetch details' };
+          }
+          logger.debug({ status: res.status, generationId, attempt }, 'Generation not ready, retrying...');
+          continue;
+        }
+        
+        const details = await res.json();
+        const data = details.data;
+        logger.debug({ generationId, attempt }, 'Successfully fetched generation details');
+        
+        const stats: Record<string, any> = {};
+        const allowedKeys = ['latency', 'model', 'generation_time', 'finish_reason', 'native_finish_reason', 'total_cost', 'id'];
+        
+        for (const key of allowedKeys) {
+          if (data[key] !== undefined) {
+            stats[key] = data[key];
+          }
+        }
+        
+        return {data:stats};
+      } catch (error) {
+        if (attempt === maxAttempts) {
+          logger.warn({ err: error, generationId, attempts: attempt }, 'Error fetching generation details after max attempts');
+          return { error: String(error) };
+        }
+        logger.debug({ err: error, generationId, attempt }, 'Error fetching generation, retrying...');
+      }
+    }
+    
+    return { error: 'Max attempts reached' };
   }
 
   async validateToolCallSupport(model: string): Promise<{ 'tools-supported': boolean; 'supported': boolean }> {
@@ -208,14 +255,15 @@ export class OpenRouterFetchProvider implements LLMProvider {
       const data = await res.json() as OpenAIChatCompletionResponse;
       
       const usage = extractUsage(data);
-      const generationId = extractGenerationId(data);
+
+      const generation_stats = await this.extractGenerationId(data);
       
       if (usage) {
-        logger.debug({ usage, generationId }, 'OpenRouter chat response metadata');
+        logger.debug({ usage, generation_stats }, 'OpenRouter chat response metadata');
       }
 
       const content = data.choices[0]?.message?.content || '';
-      return { content, usage, generationId };
+      return { content, usage, generation_stats };
     } catch (error) {
       logger.error({ err: error }, 'OpenRouter chat call failed');
       throw error;
@@ -255,10 +303,10 @@ export class OpenRouterFetchProvider implements LLMProvider {
       const data = await res.json() as OpenAIChatCompletionResponse;
       
       const usage = extractUsage(data);
-      const generationId = extractGenerationId(data);
+      const generation_stats = await this.extractGenerationId(data);
       
       if (usage) {
-        logger.debug({ usage, generationId }, 'OpenRouter callWithTools response metadata');
+        logger.debug({ usage, generation_stats }, 'OpenRouter callWithTools response metadata');
       }
 
       const choice = data.choices[0];

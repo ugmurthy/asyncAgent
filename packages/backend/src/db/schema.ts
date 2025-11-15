@@ -85,6 +85,17 @@ export const agents = sqliteTable('agents', {
   uniqueActiveNameIdx: uniqueIndex('idx_active_agent').on(table.name).where(sql`${table.active} = 1`),
 }));
 
+export const dags = sqliteTable('dags', {
+  id: text('id').primaryKey(),
+  status: text('status').notNull(),
+  result: text('result', { mode: 'json' }).$type<Record<string, any>>(),
+  usage: text('usage', { mode: 'json' }).$type<Record<string, any>>(),
+  generationStats: text('generation_stats', { mode: 'json' }).$type<Record<string, any>>(),
+  attempts: integer('attempts').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
 export type Goal = typeof goals.$inferSelect;
 export type NewGoal = typeof goals.$inferInsert;
 export type Schedule = typeof schedules.$inferSelect;
@@ -99,6 +110,8 @@ export type Memory = typeof memories.$inferSelect;
 export type NewMemory = typeof memories.$inferInsert;
 export type Agent = typeof agents.$inferSelect;
 export type NewAgent = typeof agents.$inferInsert;
+export type Dag = typeof dags.$inferSelect;
+export type NewDag = typeof dags.$inferInsert;
 
 // Relations
 export const goalsRelations = relations(goals, ({ one, many }) => ({

@@ -131,7 +131,12 @@ export class DAGExecutor {
             logger.info(`╰─dependency ${depTaskId}:${typeof depResult === 'string' ? depResult : JSON.stringify(depResult)}`);
             
             if (Object.keys(params).length === 1 || (key === 'url' && Array.isArray(depResult))) {
+              if (tool==='fetchURLs') {
+                singleDependency={}
+                singleDependency[key]=depResult;
+              } else {
               singleDependency = depResult;
+              }
             } else {
               resolvedParams[key] = depResult;
             }
@@ -182,7 +187,7 @@ export class DAGExecutor {
         }
       }
     }
-
+    logger.debug({resolvedParams,singleDependency},'resolvedParams, singleDependency')
     return { resolvedParams, singleDependency };
   }
 
@@ -198,15 +203,7 @@ export class DAGExecutor {
       originalRequest: job.original_request 
     },'Starting DAG execution');
 
-    // const validation = this.validate_sub_tasks(job);
-    // if (!validation.valid) {
-    //   const errorMessages = validation.errors.map(e => 
-    //     `Task ${e.taskId} (${e.toolName}): ${e.error}`
-    //   ).join('; ');
-    //   logger.error({ errors: validation.errors }, 'Validation failed');
-    //   throw new Error(`Validation failed: ${errorMessages}`);
-    // }
-
+   
     const taskResults = new Map<string, any>();
     const executedTasks = new Set<string>();
 

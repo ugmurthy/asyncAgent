@@ -193,14 +193,39 @@ function extractUsage(data: OpenAIChatCompletionResponse): {
 
 #### extractGenerationId()
 ```typescript
-function extractGenerationId(data: OpenAIChatCompletionResponse): string {
-  return data.id;
+async function extractGenerationId(
+  data: OpenAIChatCompletionResponse, 
+  apiKey: string
+): Promise<any> {
+  const generationId = data.id;
+  
+  try {
+    const res = await fetch(
+      `${BASE_URL}/generation?id=${generationId}`,
+      { headers: buildHeaders(apiKey) }
+    );
+    
+    if (!res.ok) {
+      logger.warn({ status: res.status, generationId }, 'Failed to fetch generation details');
+      return { id: generationId, error: 'Failed to fetch details' };
+    }
+    
+    const details = await res.json();
+    return details;
+  } catch (error) {
+    logger.warn({ err: error, generationId }, 'Error fetching generation details');
+    return { id: generationId, error: String(error) };
+  }
 }
 ```
 
-**Purpose:** Extract the generation ID from API response
-**Returns:** Generation ID string (e.g., "gen-xxxxxxxxxxxxxx")
-**Use Case:** Can be used to query detailed generation stats via `/api/v1/generation?id=$GENERATION_ID` endpoint for native token counts and precise cost information
+**Purpose:** Fetch detailed generation statistics from OpenRouter API
+**Parameters:** 
+- `data`: The chat completion response containing the generation ID
+- `apiKey`: API key for authentication
+**Returns:** Promise resolving to generation details object with native token counts, precise cost information, and model metadata
+**Error Handling:** Logs warnings and returns error object on failure, never throws
+**Use Case:** Get accurate billing information, native token counts (without OpenAI wrapper overhead), model routing details, and generation metadata
 
 ### 3. Constructor
 

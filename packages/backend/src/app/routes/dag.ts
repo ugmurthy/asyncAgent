@@ -5,10 +5,16 @@ import { z } from 'zod';
 import { DAGExecutor, type DecomposerJob } from '../../agent/dagExecutor.js';
 import type { ToolRegistry } from '../../agent/tools/index.js';
 import { createLLMProvider } from '../../agent/providers/index.js';
-import { agents } from '../../db/schema.js';
+import { agents, dags } from '../../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
-function parseJsonFromMarkdown(response: string): unknown {
+/**
+ * Extracts and parses JSON content from a markdown code block.
+ * @param response - The markdown string containing a JSON code block
+ * @returns The parsed JSON object
+ * @throws Error if no JSON code block is found or parsing fails
+ */
+function extractJsonCodeBlock(response: string): unknown {
   const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
   if (!jsonMatch || !jsonMatch[1]) {
     throw new Error('No JSON code block found in response');
@@ -71,6 +77,23 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
   const { log, db } = fastify;
   const { llmProvider, toolRegistry } = options;
 
+  /**
+   * POST /create-dag - Create a DAG (Directed Acyclic Graph) from a goal description
+   * 
+   * @param request.body.goal-text - The goal description to decompose into tasks
+   * @param request.body.agentName - Name of the agent to use for DAG creation
+   * @param request.body.provider - (Optional) LLM provider override (openai|openrouter|ollama)
+   * @param request.body.model - (Optional) LLM model override
+   * @param request.body.max_tokens - (Optional) Maximum tokens for LLM response
+   * @param request.body.temperature - (Optional) LLM temperature (0-2)
+   * @param request.body.seed - (Optional) Random seed for reproducibility
+   * 
+   * @returns {200} Success - DAG created successfully
+   * @returns {200} Clarification Required - LLM needs more information
+   * @returns {400} Bad Request - Invalid input or LLM configuration
+   * @returns {404} Not Found - Agent not found or inactive
+   * @returns {500} Server Error - DAG creation failed or response parsing error
+   */
   fastify.post('/create-dag', async (request, reply) => {
     try {
       const inputSchema = z.object({
@@ -97,7 +120,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
           }, 'Creating custom LLM provider for this request');
           
           activeLLMProvider = createLLMProvider({
-            provider: body.provider as 'openai' | 'openrouter' | 'ollama',
+            provider: body.provider as 'openai' | 'openrouter' | 'ollama' | 'openrouter-fetch',
             model: body.model,
           });
 
@@ -112,7 +135,6 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
           activeLLMProvider = llmProvider;
         }
       } catch (providerError) {
-        
         const errorMessage = providerError instanceof Error ? providerError.message : String(providerError);
         log.error({ err: errorMessage }, 'Failed to create LLM provider');
         return reply.code(400).send({
@@ -131,11 +153,9 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         });
       }
       
-      //log.info({ tools: toolRegistry.getAllDefinitions() }, 'Available tool definitions');
       const toolDefinitions = toolRegistry.getAllDefinitions();
       const systemPrompt = agent.promptTemplate
         .replace(/\{\{tools\}\}/g,JSON.stringify(toolDefinitions))
-        //.replace(/\{\{objective\}\}/g, goalText)
         .replace(/\{\{currentDate\}\}/g, new Date().toLocaleString());
 
       let currentGoalText = goalText;
@@ -159,9 +179,18 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
           ...(body.seed !== undefined && { seed: body.seed }),
         });
 
+        const MAX_RESPONSE_SIZE = 100_000; // 100KB limit
+        if (response.content.length > MAX_RESPONSE_SIZE) {
+          log.error({ responseSize: response.content.length }, 'LLM response exceeds size limit');
+          return reply.code(500).send({
+            error: `Response too large: ${response.content.length} bytes`,
+            maxSize: MAX_RESPONSE_SIZE,
+          });
+        }
+
         let result;
         try {
-          result = parseJsonFromMarkdown(response.content);
+          result = extractJsonCodeBlock(response.content);
         } catch (parseError) {
           log.error({ 
             err: parseError, 
@@ -178,8 +207,8 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
           }
           continue;
         }
-        const usage = response?.usage
-        const generationId = response?.generationId
+        const usage = response?.usage ?? null;
+        const generation_stats = response?.generation_stats ?? null;
         const validatedResult = DecomposerJobSchema.safeParse(result);
         
         if (!validatedResult.success) {
@@ -207,7 +236,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
             clarification_query: dag.clarification_query,
             result: dag,
             usage,
-            generationId
+            generation_stats
           });
         }
 
@@ -216,7 +245,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
             status: 'success',
             result: dag,
             usage,
-            generationId,
+            generation_stats,
             attempts: attempt,
           });
         }
@@ -233,7 +262,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
           status: 'success',
           result: dag,
           usage,
-          generationId,
+          generation_stats,
           attempts: attempt,
         });
       }
@@ -261,6 +290,16 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
     }
   });
 
+  /**
+   * POST /execute-dag - Execute a previously created DAG
+   * 
+   * @param request.body - Complete DecomposerJob object from /create-dag
+   * 
+   * @returns {200} Success - DAG execution completed
+   * @returns {200} Clarification Required - Job requires clarification
+   * @returns {400} Bad Request - Invalid DecomposerJob structure
+   * @returns {500} Server Error - DAG execution failed
+   */
   fastify.post('/execute-dag', async (request, reply) => {
     try {
       const job = DecomposerJobSchema.parse(request.body) as DecomposerJob;
@@ -308,48 +347,177 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
     }
   });
 
+  /**
+   * POST /dag-experiments - Log DAG creation experiments with multiple model/temperature combinations
+   * 
+   * @param request.body.goal-text - The goal description for experiments
+   * @param request.body.models - Array of model names to test
+   * @param request.body.temperatures - Array of temperature values to test
+   * @param request.body.seed - Random seed for reproducibility across experiments
+   * 
+   * @returns {200} Success - Experiments logged (note: does not execute, only logs)
+   * @returns {400} Bad Request - Invalid input parameters
+   * @returns {500} Server Error - Experiment setup failed
+   */
   fastify.post('/dag-experiments', async (request, reply) => {
     try {
       const inputSchema = z.object({
         'goal-text': z.string().min(1),
         models: z.array(z.string()).min(1),
+        agentName: z.string().min(1),
+        provider: z.string(),
         temperatures: z.array(z.number().min(0).max(2)).min(1),
-        seed: z.number().int(),
+        seed: z.number().int().optional().nullable(),
       });
 
       const body = inputSchema.parse(request.body);
-      const { 'goal-text': goalText, models, temperatures, seed } = body;
+      const { 'goal-text': goalText, models,provider,agentName, temperatures, seed } = body;
 
       log.info({ 
         goalText, 
         modelsCount: models.length, 
         temperaturesCount: temperatures.length,
-        totalExperiments: models.length * temperatures.length 
+        totalExperiments: models.length * temperatures.length, 
       }, 'Starting DAG experiments');
+
+      const experimentResults: Array<{
+        model: string;
+        temperature: number;
+        dagId: string | null;
+        success: boolean;
+        error?: string;
+      }> = [];
 
       for (const model of models) {
         for (const temperature of temperatures) {
           const requestBody = {
             'goal-text': goalText,
+            agentName,
+            provider,
             model,
             temperature,
             seed,
           };
 
           log.info({ requestBody }, 'DAG experiment request body');
+          
+          const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/v1/create-dag',
+            payload: requestBody,
+          });
+
+          const responseData = response.json();
+          let dagId: string | null = null;
+          let success = false;
+          let error: string | undefined;
+
+          try {
+            if (response.statusCode === 200 && responseData.result) {
+              dagId = generateId('dag');
+              
+              await db.insert(dags).values({
+                id: dagId,
+                status: responseData.status || 'unknown',
+                result: responseData.result,
+                usage: responseData.usage || null,
+                generationStats: responseData.generation_stats || null,
+                attempts: responseData.attempts || 0,
+              });
+
+              success = true;
+              log.info({ dagId, model, temperature }, 'DAG record inserted successfully');
+            } else {
+              error = `Request failed with status ${response.statusCode}`;
+              log.warn({ model, temperature, statusCode: response.statusCode }, 'DAG creation request failed');
+            }
+          } catch (insertError) {
+            error = insertError instanceof Error ? insertError.message : String(insertError);
+            log.error({ err: insertError, model, temperature }, 'Failed to insert DAG record');
+          }
+
+          experimentResults.push({
+            dagId,
+            model,
+            temperature,
+            success,
+            error,
+          });
         }
       }
 
+      const successCount = experimentResults.filter(r => r.success).length;
+      const failureCount = experimentResults.filter(r => !r.success).length;
+
       return reply.code(200).send({
-        status: 'experiments_logged',
-        totalExperiments: models.length * temperatures.length,
-        models,
-        temperatures,
-        seed,
+        status: 'completed',
+        totalExperiments: experimentResults.length,
+        successCount,
+        failureCount,
+        results: experimentResults,
       });
 
     } catch (error) {
       log.error({ err: error }, 'DAG experiments failed');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid input parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * POST /dag-run - Run a previously created DAG by retrieving it and executing
+   * 
+   * @param request.body.dagId - The ID of the DAG to retrieve and execute
+   * 
+   * @returns {200} Success - DAG retrieved and posted to /execute-dag
+   * @returns {400} Bad Request - Invalid dagId parameter
+   * @returns {404} Not Found - DAG not found
+   * @returns {500} Server Error - Execution request failed
+   */
+  fastify.post('/dag-run', async (request, reply) => {
+    try {
+      const inputSchema = z.object({
+        dagId: z.string().min(1),
+      });
+
+      const body = inputSchema.parse(request.body);
+      const { dagId } = body;
+
+      const dagRecord = await db.query.dags.findFirst({
+        where: eq(dags.id, dagId),
+      });
+
+      if (!dagRecord) {
+        return reply.code(404).send({
+          error: `DAG with id '${dagId}' not found`,
+        });
+      }
+
+      log.info({ dagId }, 'Retrieved DAG, forwarding to execute-dag');
+
+      const executeResponse = await fastify.inject({
+        method: 'POST',
+        url: '/api/v1/execute-dag',
+        payload: dagRecord.result,
+      });
+
+      const executeData = executeResponse.json();
+
+      return reply.code(executeResponse.statusCode).send(executeData);
+
+    } catch (error) {
+      log.error({ err: error }, 'DAG run failed');
       
       if (error instanceof z.ZodError) {
         return reply.code(400).send({
