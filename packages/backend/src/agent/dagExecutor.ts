@@ -113,82 +113,127 @@ export class DAGExecutor {
     params: Record<string, any>,
     taskResults: Map<string, any>,
     logger: Logger,
-    tool:string
+    tool: string
   ): { resolvedParams: Record<string, any>; singleDependency: any | null } {
     const resolvedParams = { ...params };
     let singleDependency: any = null;
+    const DEPENDENCY_PATTERN = /<Results? (?:from|of) Task (\d+)>/g;
 
     for (const [key, value] of Object.entries(resolvedParams)) {
-      if (typeof value === 'string') {
-        const exactMatch = value.match(/^<Results? (?:from|of) Task (\d+)>$/);
-        
-        if (exactMatch) {
-          const depTaskId = exactMatch[1];
-          const depResult = taskResults.get(depTaskId);
-          
-          if (depResult !== undefined) {
-            logger.info(`╰─dependency ${key}`);
-            logger.info(`╰─dependency ${depTaskId}:${typeof depResult === 'string' ? depResult : JSON.stringify(depResult)}`);
-            
-            if (Object.keys(params).length === 1 || (key === 'url' && Array.isArray(depResult))) {
-              if (tool==='fetchURLs') {
-                singleDependency={}
-                singleDependency[key]=depResult;
-              } else {
-              singleDependency = depResult;
-              }
-            } else {
-              resolvedParams[key] = depResult;
-            }
-          }
-        } else if (value.match(/<Results? (?:from|of) Task \d+>/)) { // multi matches in value
-          
-          const matches = [...value.matchAll(/<Results? (?:from|of) Task (\d+)>/g)];
-          let resolvedValue = value;
-          let resolvedArray = [] 
-          logger.info(`╰─tool ${tool}`);
-          if (tool==='fetchURLs') {// for tool = fetchURLs
-            for (const match of matches) {
-              const depTaskId = match[1];
-              const depResult = taskResults.get(depTaskId);
-              let _urls = [];
-              if (Array.isArray(depResult)) { // expected to be an array of objects
-                _urls = depResult.map((obj)=>obj["url"]); // extract all url values
-              } else if (typeof depResult === 'string') {
-                const _urls = this.extractUrls(depResult);
-              }
-              if (_urls.length) {
-                  resolvedArray = [...resolvedArray,..._urls];
-              }
-              logger.info(`╰─dependency reference in '${key}': Task ${depTaskId}`);
-              
-            }
-            
-            resolvedParams[key] = resolvedArray;
-          } else { // all other tools that rely in string input
-            for (const match of matches) {
-              const depTaskId = match[1];
-              const depResult = taskResults.get(depTaskId);
-              
-              if (depResult !== undefined) {
-                const matchedText = match[0];
-                const replacementValue = typeof depResult === 'string' 
-                  ? depResult 
-                  : JSON.stringify(depResult);
-                
-                resolvedValue = resolvedValue.replace(matchedText, replacementValue);
-                logger.info(`  ╰─dependency reference in '${key}': Task ${depTaskId}`);
-              }
-            }
-            
-            resolvedParams[key] = resolvedValue;
-          }
+      if (typeof value !== 'string') continue;
 
-        }
+      const exactMatch = value.match(/^<Results? (?:from|of) Task (\d+)>$/);
+      
+      if (exactMatch) {
+        this.handleExactMatch(exactMatch, key, params, tool, taskResults, logger, resolvedParams, (result) => {
+          singleDependency = result;
+        });
+      } else if (value.match(DEPENDENCY_PATTERN)) {
+        this.handleMultipleMatches(value, key, tool, taskResults, logger, resolvedParams);
       }
     }
-    logger.debug({resolvedParams,singleDependency},'resolvedParams, singleDependency')
+
+    logger.debug({ resolvedParams, singleDependency }, 'resolvedParams, singleDependency');
     return { resolvedParams, singleDependency };
+  }
+
+  private handleExactMatch(
+    exactMatch: RegExpMatchArray,
+    key: string,
+    params: Record<string, any>,
+    tool: string,
+    taskResults: Map<string, any>,
+    logger: Logger,
+    resolvedParams: Record<string, any>,
+    setSingleDependency: (result: any) => void
+  ): void {
+    const depTaskId = exactMatch[1];
+    const depResult = taskResults.get(depTaskId);
+    
+    if (depResult === undefined) return;
+
+    const resultStr = typeof depResult === 'string' ? depResult : JSON.stringify(depResult);
+    logger.info(`╰─dependency ${key}`);
+    logger.info(`╰─dependency ${depTaskId}:${resultStr}`);
+    
+    const isSingleParam = Object.keys(params).length === 1 || (key === 'url' && Array.isArray(depResult));
+    
+    if (isSingleParam) {
+      setSingleDependency(tool === 'fetchURLs' ? { [key]: depResult } : depResult);
+    } else {
+      resolvedParams[key] = depResult;
+    }
+  }
+
+  private handleMultipleMatches(
+    value: string,
+    key: string,
+    tool: string,
+    taskResults: Map<string, any>,
+    logger: Logger,
+    resolvedParams: Record<string, any>
+  ): void {
+    const DEPENDENCY_PATTERN = /<Results? (?:from|of) Task (\d+)>/g;
+    const matches = [...value.matchAll(DEPENDENCY_PATTERN)];
+    
+    //logger.info(`╰─tool ${tool}`);
+
+    if (tool === 'fetchURLs') {
+      resolvedParams[key] = this.resolveFetchURLs(matches, key, taskResults, logger);
+    } else {
+      resolvedParams[key] = this.resolveStringReplacements(value, matches, key, taskResults, logger);
+    }
+  }
+
+  private resolveFetchURLs(
+    matches: RegExpMatchArray[],
+    key: string,
+    taskResults: Map<string, any>,
+    logger: Logger
+  ): string[] {
+    const urlArray: string[] = [];
+
+    for (const match of matches) {
+      const depTaskId = match[1];
+      const depResult = taskResults.get(depTaskId);
+      
+      const urls = Array.isArray(depResult)
+        ? depResult.map((obj) => obj.url).filter(Boolean)
+        : typeof depResult === 'string'
+        ? this.extractUrls(depResult)
+        : [];
+
+      if (urls.length) {
+        urlArray.push(...urls);
+      }
+      
+      logger.info(`╰─dependency reference in '${key}': Task ${depTaskId} - URLs`);
+    }
+
+    return urlArray;
+  }
+
+  private resolveStringReplacements(
+    value: string,
+    matches: RegExpMatchArray[],
+    key: string,
+    taskResults: Map<string, any>,
+    logger: Logger
+  ): string {
+    let resolvedValue = value;
+
+    for (const match of matches) {
+      const depTaskId = match[1];
+      const depResult = taskResults.get(depTaskId);
+      
+      if (depResult !== undefined) {
+        const replacementValue = typeof depResult === 'string' ? depResult : JSON.stringify(depResult);
+        resolvedValue = resolvedValue.replace(match[0], replacementValue);
+        logger.info(`  ╰─dependency reference in '${key}': Task ${depTaskId} - string replacements`);
+      }
+    }
+
+    return resolvedValue;
   }
 
   async execute(job: DecomposerJob): Promise<string> {
@@ -200,7 +245,7 @@ export class DAGExecutor {
 
     logger.info( { 
       totalTasks: job.sub_tasks.length,
-      originalRequest: job.original_request 
+      primaryIntent: job.intent.primary 
     },'Starting DAG execution');
 
    
@@ -218,8 +263,9 @@ export class DAGExecutor {
       logger.info(`Executing task ${task.id}: ${task.description}`);
       logger.info(`╰─task_or_prompt ${JSON.stringify(task.tool_or_prompt)}`)
       if (task.action_type === 'tool') {
+        logger.info(` ╰─action_type ${task.action_type}, name: ${task.tool_or_prompt.name}`)
         const tool = toolRegistry.get(task.tool_or_prompt.name);
-        
+        // @TODO : Validate sub-task 
         if (!tool) {
           throw new Error(`Tool not found: ${task.tool_or_prompt.name}`);
         }

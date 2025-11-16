@@ -313,7 +313,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       }
 
       log.info({ 
-        originalRequest: job.original_request,
+        primaryIntent: job.intent.primary,
         totalTasks: job.sub_tasks.length 
       },'Starting DAG execution');
 
