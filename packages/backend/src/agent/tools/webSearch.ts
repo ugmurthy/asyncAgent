@@ -22,7 +22,7 @@ export class WebSearchTool extends BaseTool<WebSearchInput, SearchResult[]> {
   inputSchema = webSearchInputSchema;
 
   async execute(input: WebSearchInput, ctx: ToolContext): Promise<SearchResult[]> {
-    ctx.logger.info(`Searching web for: ${input.query}`);
+    ctx.logger.info({query:input.query},`  ╰─Searching web...`);
 
     try {
       // Using DuckDuckGo HTML search (no API key needed)
@@ -39,10 +39,10 @@ export class WebSearchTool extends BaseTool<WebSearchInput, SearchResult[]> {
       const html = await response.text();
       const results = this.parseSearchResults(html, input.limit);
 
-      ctx.logger.info(`Found ${results.length} search results`);
+      ctx.logger.info(`   ╰─Found ${results.length} search results`);
       return results;
     } catch (error) {
-      ctx.logger.error({ err: error }, 'Web search failed');
+      ctx.logger.error({ err: error }, '   ╰─Web search failed');
       throw error;
     }
   }

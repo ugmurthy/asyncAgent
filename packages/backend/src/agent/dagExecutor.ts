@@ -122,18 +122,23 @@ export class DAGExecutor {
     for (const [key, value] of Object.entries(resolvedParams)) {
       if (typeof value !== 'string') continue;
 
-      const exactMatch = value.match(/^<Results? (?:from|of) Task (\d+)>$/);
+      //const exactMatch = value.match(/^<Results? (?:from|of) Task (\d+)>$/);
       
-      if (exactMatch) {
-        this.handleExactMatch(exactMatch, key, params, tool, taskResults, logger, resolvedParams, (result) => {
-          singleDependency = result;
-        });
-      } else if (value.match(DEPENDENCY_PATTERN)) {
-        this.handleMultipleMatches(value, key, tool, taskResults, logger, resolvedParams);
+      // if (exactMatch) {
+      //   this.handleExactMatch(exactMatch, key, params, tool, taskResults, logger, resolvedParams, (result) => {
+      //     singleDependency = result;
+      //   });
+      // } else if (value.match(DEPENDENCY_PATTERN)) {
+      //   this.handleMultipleMatches(value, key, tool, taskResults, logger, resolvedParams);
+      // }
+
+      if (value.match(DEPENDENCY_PATTERN)) {
+         this.handleMultipleMatches(value, key, tool, taskResults, logger, resolvedParams);
       }
+      
     }
 
-    logger.debug({ resolvedParams, singleDependency }, 'resolvedParams, singleDependency');
+    //logger.debug({ resolvedParams, singleDependency }, 'resolvedParams, singleDependency');
     return { resolvedParams, singleDependency };
   }
 
@@ -260,10 +265,10 @@ export class DAGExecutor {
     };
 
     const executeTask = async (task: SubTask): Promise<any> => {
-      logger.info(`Executing task ${task.id}: ${task.description}`);
-      logger.info(`╰─task_or_prompt ${JSON.stringify(task.tool_or_prompt)}`)
+      logger.info({id:task.id,description:task.description},`Executing sub-task`);
+      logger.info({tool_or_prompt:task.tool_or_prompt},`╰─task_or_prompt`)
       if (task.action_type === 'tool') {
-        logger.info(` ╰─action_type ${task.action_type}, name: ${task.tool_or_prompt.name}`)
+        logger.info({action_type:task.action_type,name:task.tool_or_prompt.name},' ╰─action_type,tool')
         const tool = toolRegistry.get(task.tool_or_prompt.name);
         // @TODO : Validate sub-task 
         if (!tool) {
