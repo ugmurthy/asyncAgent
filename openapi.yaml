@@ -29,6 +29,10 @@ tags:
     description: Run execution and monitoring
   - name: agents
     description: Agent management operations
+  - name: tools
+    description: Tool registry and definitions
+  - name: dag
+    description: DAG (Directed Acyclic Graph) creation and execution
 
 paths:
   /health:
@@ -636,6 +640,280 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/tools:
+    get:
+      tags:
+        - tools
+      summary: List all tools or get specific tool
+      description: Retrieve all tool definitions or a specific tool by name
+      operationId: listTools
+      parameters:
+        - name: name
+          in: query
+          required: false
+          description: Filter tools by name (returns single tool if found)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tool definitions
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: "#/components/schemas/ToolDefinition"
+                  - $ref: "#/components/schemas/ToolDefinition"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/create-dag:
+    post:
+      tags:
+        - dag
+      summary: Create a DAG from goal text
+      description: Decompose a goal into a directed acyclic graph of sub-tasks
+      operationId: createDAG
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDAGRequest"
+      responses:
+        "200":
+          description: DAG created successfully or clarification required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateDAGResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/execute-dag:
+    post:
+      tags:
+        - dag
+      summary: Execute a DAG
+      description: Start execution of a previously created DAG
+      operationId: executeDAG
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - dagId
+              properties:
+                dagId:
+                  type: string
+                  description: The DAG ID to execute
+      responses:
+        "202":
+          description: DAG execution started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecuteDAGResponse"
+        "200":
+          description: Clarification required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClarificationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/resume-dag/{executionId}:
+    post:
+      tags:
+        - dag
+      summary: Resume a suspended DAG execution
+      description: Resume a suspended or failed DAG execution
+      operationId: resumeDAG
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          description: The execution ID to resume
+          schema:
+            type: string
+            pattern: ^dag-exec_[a-z0-9]+$
+      responses:
+        "202":
+          description: Execution resumed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResumeDAGResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/dag-executions:
+    get:
+      tags:
+        - dag
+      summary: List DAG executions
+      description: Retrieve all DAG executions with optional filtering
+      operationId: listDAGExecutions
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of results (default 50)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          description: Number of results to skip (default 0)
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: status
+          in: query
+          required: false
+          description: Filter by execution status
+          schema:
+            type: string
+            enum: [pending, running, waiting, completed, failed, partial, suspended]
+      responses:
+        "200":
+          description: List of DAG executions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DAGExecutionList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/dag-executions/{id}:
+    get:
+      tags:
+        - dag
+      summary: Get DAG execution details
+      description: Retrieve a specific DAG execution with its sub-steps
+      operationId: getDAGExecution
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The execution ID
+          schema:
+            type: string
+            pattern: ^dag-exec_[a-z0-9]+$
+      responses:
+        "200":
+          description: DAG execution details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DAGExecutionWithSteps"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      tags:
+        - dag
+      summary: Delete DAG execution
+      description: Delete a DAG execution and all its sub-steps
+      operationId: deleteDAGExecution
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The execution ID
+          schema:
+            type: string
+            pattern: ^dag-exec_[a-z0-9]+$
+      responses:
+        "200":
+          description: Execution deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteDAGExecutionResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/dag-executions/{id}/sub-steps:
+    get:
+      tags:
+        - dag
+      summary: Get DAG execution sub-steps
+      description: Retrieve all sub-steps for a specific DAG execution
+      operationId: getDAGExecutionSubSteps
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The execution ID
+          schema:
+            type: string
+            pattern: ^dag-exec_[a-z0-9]+$
+      responses:
+        "200":
+          description: List of sub-steps
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DAGSubStepsList"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/dag-executions/{id}/events:
+    get:
+      tags:
+        - dag
+      summary: Stream DAG execution events
+      description: Server-Sent Events stream for real-time DAG execution updates
+      operationId: streamDAGExecutionEvents
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The execution ID
+          schema:
+            type: string
+            pattern: ^dag-exec_[a-z0-9]+$
+      responses:
+        "200":
+          description: SSE stream with execution events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1110,6 +1388,411 @@ components:
           description: Additional agent metadata
           example: {}
       additionalProperties: false
+
+    ToolDefinition:
+      type: object
+      required:
+        - type
+        - function
+      properties:
+        type:
+          type: string
+          enum: [function]
+          description: Tool type
+        function:
+          type: object
+          required:
+            - name
+            - description
+          properties:
+            name:
+              type: string
+              description: Tool function name
+            description:
+              type: string
+              description: Tool description
+            parameters:
+              type: object
+              description: JSON Schema for tool parameters
+              additionalProperties: true
+
+    CreateDAGRequest:
+      type: object
+      required:
+        - goal-text
+        - agentName
+      properties:
+        goal-text:
+          type: string
+          minLength: 1
+          description: The goal description to decompose
+        agentName:
+          type: string
+          minLength: 1
+          description: Name of the agent to use
+        provider:
+          type: string
+          description: Optional LLM provider override
+        model:
+          type: string
+          description: Optional LLM model override
+        max_tokens:
+          type: integer
+          description: Maximum tokens for LLM response
+        temperature:
+          type: number
+          description: LLM temperature (0-2)
+        seed:
+          type: integer
+          description: Random seed for reproducibility
+
+    CreateDAGResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [success, clarification_required]
+        result:
+          $ref: "#/components/schemas/DecomposerJob"
+        clarification_query:
+          type: string
+          nullable: true
+        usage:
+          type: object
+          nullable: true
+          additionalProperties: true
+        generation_stats:
+          type: object
+          nullable: true
+          additionalProperties: true
+        attempts:
+          type: integer
+
+    DecomposerJob:
+      type: object
+      required:
+        - original_request
+        - intent
+        - entities
+        - sub_tasks
+        - synthesis_plan
+        - validation
+        - clarification_needed
+      properties:
+        original_request:
+          type: string
+        intent:
+          type: object
+          required:
+            - primary
+            - sub_intents
+          properties:
+            primary:
+              type: string
+            sub_intents:
+              type: array
+              items:
+                type: string
+        entities:
+          type: array
+          items:
+            type: object
+            required:
+              - entity
+              - type
+              - grounded_value
+            properties:
+              entity:
+                type: string
+              type:
+                type: string
+              grounded_value:
+                type: string
+        sub_tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubTask"
+        synthesis_plan:
+          type: string
+        validation:
+          type: object
+          required:
+            - coverage
+            - gaps
+            - iteration_triggers
+          properties:
+            coverage:
+              type: string
+            gaps:
+              type: array
+              items:
+                type: string
+            iteration_triggers:
+              type: array
+              items:
+                type: string
+        clarification_needed:
+          type: boolean
+        clarification_query:
+          type: string
+          nullable: true
+
+    SubTask:
+      type: object
+      required:
+        - id
+        - description
+        - thought
+        - action_type
+        - tool_or_prompt
+        - expected_output
+        - dependencies
+      properties:
+        id:
+          type: string
+        description:
+          type: string
+        thought:
+          type: string
+        action_type:
+          type: string
+          enum: [tool, inference]
+        tool_or_prompt:
+          type: object
+          required:
+            - name
+          properties:
+            name:
+              type: string
+            params:
+              type: object
+              additionalProperties: true
+        expected_output:
+          type: string
+        dependencies:
+          type: array
+          items:
+            type: string
+
+    ExecuteDAGResponse:
+      type: object
+      required:
+        - status
+        - executionId
+        - dagId
+        - originalRequest
+        - totalTasks
+        - message
+      properties:
+        status:
+          type: string
+          enum: [started]
+        executionId:
+          type: string
+          pattern: ^dag-exec_[a-z0-9]+$
+        dagId:
+          type: string
+        originalRequest:
+          type: string
+        totalTasks:
+          type: integer
+        message:
+          type: string
+
+    ClarificationResponse:
+      type: object
+      required:
+        - status
+        - clarification_query
+      properties:
+        status:
+          type: string
+          enum: [clarification_required]
+        clarification_query:
+          type: string
+        validation:
+          type: object
+          additionalProperties: true
+
+    ResumeDAGResponse:
+      type: object
+      required:
+        - status
+        - executionId
+        - dagId
+        - retryCount
+        - message
+      properties:
+        status:
+          type: string
+          enum: [resumed]
+        executionId:
+          type: string
+          pattern: ^dag-exec_[a-z0-9]+$
+        dagId:
+          type: string
+        retryCount:
+          type: integer
+        message:
+          type: string
+
+    DAGExecution:
+      type: object
+      required:
+        - id
+        - dagId
+        - status
+        - completedTasks
+        - failedTasks
+        - waitingTasks
+        - retryCount
+        - createdAt
+      properties:
+        id:
+          type: string
+          pattern: ^dag-exec_[a-z0-9]+$
+        dagId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, running, waiting, completed, failed, partial, suspended]
+        completedTasks:
+          type: integer
+        failedTasks:
+          type: integer
+        waitingTasks:
+          type: integer
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastRetryAt:
+          type: string
+          format: date-time
+          nullable: true
+        retryCount:
+          type: integer
+        error:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    DAGExecutionWithSteps:
+      allOf:
+        - $ref: "#/components/schemas/DAGExecution"
+        - type: object
+          required:
+            - subSteps
+          properties:
+            subSteps:
+              type: array
+              items:
+                $ref: "#/components/schemas/SubStepRecord"
+
+    SubStepRecord:
+      type: object
+      required:
+        - id
+        - executionId
+        - taskId
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+          pattern: ^substep_[a-z0-9]+$
+        executionId:
+          type: string
+          pattern: ^dag-exec_[a-z0-9]+$
+        taskId:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed, blocked, waiting]
+        result:
+          type: object
+          nullable: true
+          additionalProperties: true
+        error:
+          type: string
+          nullable: true
+        durationMs:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    DAGExecutionList:
+      type: object
+      required:
+        - executions
+        - pagination
+      properties:
+        executions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DAGExecution"
+        pagination:
+          type: object
+          required:
+            - limit
+            - offset
+            - count
+          properties:
+            limit:
+              type: integer
+            offset:
+              type: integer
+            count:
+              type: integer
+
+    DAGSubStepsList:
+      type: object
+      required:
+        - executionId
+        - subSteps
+      properties:
+        executionId:
+          type: string
+          pattern: ^dag-exec_[a-z0-9]+$
+        subSteps:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubStepRecord"
+
+    DeleteDAGExecutionResponse:
+      type: object
+      required:
+        - message
+        - executionId
+        - cascadeInfo
+      properties:
+        message:
+          type: string
+        executionId:
+          type: string
+          pattern: ^dag-exec_[a-z0-9]+$
+        cascadeInfo:
+          type: object
+          required:
+            - relatedSubStepsDeleted
+          properties:
+            relatedSubStepsDeleted:
+              type: integer
 
     CreateGoalRequest:
       type: object

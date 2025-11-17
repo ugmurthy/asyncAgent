@@ -6,15 +6,19 @@ import type { BaseHttpRequest } from './core/BaseHttpRequest.js';
 import type { OpenAPIConfig } from './core/OpenAPI.js';
 import { AxiosHttpRequest } from './core/AxiosHttpRequest.js';
 import { AgentsService } from './services/AgentsService.js';
+import { DagService } from './services/DagService.js';
 import { GoalsService } from './services/GoalsService.js';
 import { HealthService } from './services/HealthService.js';
 import { RunsService } from './services/RunsService.js';
+import { ToolsService } from './services/ToolsService.js';
 type HttpRequestConstructor = new (config: OpenAPIConfig) => BaseHttpRequest;
 export class AsyncAgentClient {
     public readonly agents: AgentsService;
+    public readonly dag: DagService;
     public readonly goals: GoalsService;
     public readonly health: HealthService;
     public readonly runs: RunsService;
+    public readonly tools: ToolsService;
     public readonly request: BaseHttpRequest;
     constructor(config?: Partial<OpenAPIConfig>, HttpRequest: HttpRequestConstructor = AxiosHttpRequest) {
         this.request = new HttpRequest({
@@ -29,9 +33,11 @@ export class AsyncAgentClient {
             ENCODE_PATH: config?.ENCODE_PATH,
         });
         this.agents = new AgentsService(this.request);
+        this.dag = new DagService(this.request);
         this.goals = new GoalsService(this.request);
         this.health = new HealthService(this.request);
         this.runs = new RunsService(this.request);
+        this.tools = new ToolsService(this.request);
     }
 }
 
