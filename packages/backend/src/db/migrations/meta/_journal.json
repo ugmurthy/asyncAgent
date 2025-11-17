@@ -29,6 +29,20 @@
       "when": 1763303539689,
       "tag": "0003_sour_greymalkin",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1763370278209,
+      "tag": "0004_rich_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1763378227027,
+      "tag": "0005_zippy_preak",
+      "breakpoints": true
     }
   ]
 }

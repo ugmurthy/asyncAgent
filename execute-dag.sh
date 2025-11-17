@@ -13,6 +13,6 @@ DAG_ID="$1"
 BASE_URL="http://localhost:3000/api/v1"
 
 echo "Triggering DAG run for dagId: $DAG_ID"
-curl -X POST "$BASE_URL/dag-run" \
+curl -X POST "$BASE_URL/execute-dag" \
   -H "Content-Type: application/json" \
   -d "{\"dagId\": \"$DAG_ID\"}" | jq '.'

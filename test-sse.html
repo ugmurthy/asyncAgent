@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SSE DAG Execution Test</title>
+  <style>
+    body {
+      font-family: 'Monaco', 'Courier New', monospace;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1e1e1e;
+      color: #d4d4d4;
+    }
+    h1 { color: #4ec9b0; }
+    .container { display: flex; gap: 20px; }
+    .panel {
+      flex: 1;
+      background: #252526;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #3e3e42;
+    }
+    .events {
+      max-height: 500px;
+      overflow-y: auto;
+      background: #1e1e1e;
+      padding: 10px;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+    .event {
+      margin-bottom: 8px;
+      padding: 8px;
+      background: #2d2d30;
+      border-left: 3px solid #007acc;
+      border-radius: 3px;
+    }
+    .event.created { border-color: #4ec9b0; }
+    .event.started { border-color: #dcdcaa; }
+    .event.completed { border-color: #6a9955; }
+    .event.failed { border-color: #f44747; }
+    .event.updated { border-color: #569cd6; }
+    .event-type { color: #569cd6; font-weight: bold; }
+    .timestamp { color: #858585; font-size: 10px; }
+    button {
+      background: #007acc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover { background: #005a9e; }
+    button:disabled {
+      background: #3e3e42;
+      cursor: not-allowed;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      background: #3c3c3c;
+      border: 1px solid #3e3e42;
+      color: #d4d4d4;
+      border-radius: 3px;
+      margin-bottom: 10px;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .status.running { background: #dcdcaa; color: #1e1e1e; }
+    .status.completed { background: #6a9955; color: white; }
+    .status.failed { background: #f44747; color: white; }
+  </style>
+</head>
+<body>
+  <h1>🔄 SSE DAG Execution Test</h1>
+  
+  <div class="container">
+    <div class="panel">
+      <h3>Control Panel</h3>
+      <label>Execution ID:</label>
+      <input type="text" id="executionId" placeholder="dag-exec_..." />
+      
+      <button id="connectBtn" onclick="connectSSE()">Connect to SSE Stream</button>
+      <button id="disconnectBtn" onclick="disconnectSSE()" disabled>Disconnect</button>
+      
+      <div style="margin-top: 20px;">
+        <h4>Execution Status</h4>
+        <div id="status">Not connected</div>
+      </div>
+    </div>
+    
+    <div class="panel">
+      <h3>Event Stream</h3>
+      <div class="events" id="events"></div>
+    </div>
+  </div>
+
+  <script>
+    let eventSource = null;
+    const eventsDiv = document.getElementById('events');
+    const statusDiv = document.getElementById('status');
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const executionIdInput = document.getElementById('executionId');
+
+    function addEvent(type, data) {
+      const event = document.createElement('div');
+      event.className = `event ${type.split('.')[1] || type}`;
+      
+      const time = new Date(data.timestamp).toLocaleTimeString();
+      
+      let content = `<div class="event-type">${type}</div>`;
+      content += `<div class="timestamp">${time}</div>`;
+      
+      if (type === 'execution.created') {
+        content += `<div>Total Tasks: ${data.totalTasks}</div>`;
+      } else if (type === 'execution.updated') {
+        content += `<div>Status: <span class="status ${data.status}">${data.status}</span></div>`;
+        content += `<div>Completed: ${data.completedTasks}, Failed: ${data.failedTasks}, Waiting: ${data.waitingTasks}</div>`;
+      } else if (type === 'execution.completed') {
+        content += `<div>Status: <span class="status completed">${data.status}</span></div>`;
+        content += `<div>Duration: ${data.durationMs}ms</div>`;
+        content += `<div>Completed: ${data.completedTasks}, Failed: ${data.failedTasks}</div>`;
+      } else if (type === 'substep.started') {
+        content += `<div>Task ${data.taskId}: ${data.description}</div>`;
+      } else if (type === 'substep.completed') {
+        content += `<div>Task ${data.taskId} completed in ${data.durationMs}ms</div>`;
+      } else if (type === 'substep.failed') {
+        content += `<div>Task ${data.taskId} failed: ${data.error}</div>`;
+      }
+      
+      event.innerHTML = content;
+      eventsDiv.insertBefore(event, eventsDiv.firstChild);
+    }
+
+    function connectSSE() {
+      const executionId = executionIdInput.value.trim();
+      if (!executionId) {
+        alert('Please enter an execution ID');
+        return;
+      }
+
+      const url = `http://localhost:3000/api/v1/dag-executions/${executionId}/events`;
+      
+      eventSource = new EventSource(url);
+      
+      eventSource.addEventListener('execution.created', (e) => {
+        addEvent('execution.created', JSON.parse(e.data));
+      });
+      
+      eventSource.addEventListener('execution.updated', (e) => {
+        const data = JSON.parse(e.data);
+        addEvent('execution.updated', data);
+        statusDiv.innerHTML = `<span class="status ${data.status}">${data.status}</span> - Completed: ${data.completedTasks}, Failed: ${data.failedTasks}`;
+      });
+      
+      eventSource.addEventListener('execution.completed', (e) => {
+        const data = JSON.parse(e.data);
+        addEvent('execution.completed', data);
+        statusDiv.innerHTML = `<span class="status completed">Completed</span> - Duration: ${data.durationMs}ms`;
+      });
+      
+      eventSource.addEventListener('execution.failed', (e) => {
+        addEvent('execution.failed', JSON.parse(e.data));
+      });
+      
+      eventSource.addEventListener('substep.started', (e) => {
+        addEvent('substep.started', JSON.parse(e.data));
+      });
+      
+      eventSource.addEventListener('substep.completed', (e) => {
+        addEvent('substep.completed', JSON.parse(e.data));
+      });
+      
+      eventSource.addEventListener('substep.failed', (e) => {
+        addEvent('substep.failed', JSON.parse(e.data));
+      });
+      
+      eventSource.addEventListener('heartbeat', (e) => {
+        console.log('❤️ Heartbeat received');
+      });
+      
+      eventSource.onerror = (err) => {
+        console.error('SSE Error:', err);
+        statusDiv.innerHTML = '<span class="status failed">Connection Error</span>';
+      };
+
+      connectBtn.disabled = true;
+      disconnectBtn.disabled = false;
+      statusDiv.innerHTML = '<span class="status running">Connected</span>';
+    }
+
+    function disconnectSSE() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      connectBtn.disabled = false;
+      disconnectBtn.disabled = true;
+      statusDiv.innerHTML = 'Disconnected';
+    }
+  </script>
+</body>
+</html>

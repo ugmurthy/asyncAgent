@@ -6,7 +6,8 @@ import { DAGExecutor, type DecomposerJob } from '../../agent/dagExecutor.js';
 import type { ToolRegistry } from '../../agent/tools/index.js';
 import { createLLMProvider } from '../../agent/providers/index.js';
 import { agents, dags, dagExecutions, subSteps } from '../../db/schema.js';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
+import { dagEventBus, type DAGEvent } from '../../events/bus.js';
 
 /**
  * Extracts and parses JSON content from a markdown code block.
@@ -293,22 +294,42 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
   /**
    * POST /execute-dag - Execute a previously created DAG
    * 
-   * @param request.body - Complete DecomposerJob object from /create-dag
+   * @param request.body.dagId - The ID of the DAG to retrieve and execute
    * 
-   * @returns {200} Success - DAG execution completed
+   * @returns {202} Success - DAG execution started
    * @returns {200} Clarification Required - Job requires clarification
-   * @returns {400} Bad Request - Invalid DecomposerJob structure
+   * @returns {400} Bad Request - Invalid dagId parameter
+   * @returns {404} Not Found - DAG not found
    * @returns {500} Server Error - DAG execution failed
    */
   fastify.post('/execute-dag', async (request, reply) => {
     try {
-      const job = DecomposerJobSchema.parse(request.body) as DecomposerJob;
+      const inputSchema = z.object({
+        dagId: z.string().min(1),
+      });
+
+      const body = inputSchema.parse(request.body);
+      const { dagId } = body;
+
+      const dagRecord = await db.query.dags.findFirst({
+        where: eq(dags.id, dagId),
+      });
+
+      if (!dagRecord) {
+        return reply.code(404).send({
+          error: `DAG with id '${dagId}' not found`,
+        });
+      }
+
+      log.info({ dagId }, 'Retrieved DAG for execution');
+
+      const job = DecomposerJobSchema.parse(dagRecord.result) as DecomposerJob;
 
       if (job.clarification_needed) {
         return reply.code(200).send({
           status: 'clarification_required',
           clarification_query: job.clarification_query,
-          job,
+          validation: job.validation
         });
       }
 
@@ -316,6 +337,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       
       log.info({ 
         executionId,
+        dagId,
         primaryIntent: job.intent.primary,
         totalTasks: job.sub_tasks.length 
       },'Starting DAG execution');
@@ -327,19 +349,156 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         db,
       });
 
-      const result = await dagExecutor.execute(job, executionId);
+      // Execute asynchronously in background
+      dagExecutor.execute(job, executionId, dagId).catch((error) => {
+        log.error({ err: error, executionId }, 'DAG execution failed in background');
+      });
 
-      return reply.code(200).send({
-        status: 'completed',
+      // Return immediately with execution ID
+      return reply.code(202).send({
+        status: 'started',
         executionId,
-        result,
+        dagId,
         originalRequest: job.original_request,
-        tasksExecuted: job.sub_tasks.length,
+        totalTasks: job.sub_tasks.length,
+        message: 'DAG execution started. Connect to SSE stream for live updates.',
       });
 
     } catch (error) {
-      log.error({ err: error }, 'DAG execution failed');
+      log.error({ err: error }, 'Failed to start DAG execution');
       
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid input parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        status: 'failed',
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * POST /resume-dag/:executionId - Resume a suspended or failed DAG execution
+   * 
+   * @param request.params.executionId - The execution ID to resume
+   * 
+   * @returns {202} Accepted - Execution resumed successfully
+   * @returns {400} Bad Request - Cannot resume execution with current status
+   * @returns {404} Not Found - Execution or DAG not found
+   * @returns {500} Server Error - Failed to resume execution
+   */
+  fastify.post('/resume-dag/:executionId', async (request, reply) => {
+    try {
+      const paramsSchema = z.object({
+        executionId: z.string().min(1),
+      });
+
+      const params = paramsSchema.parse(request.params);
+      const { executionId } = params;
+
+      // Fetch existing execution
+      const execution = await db.query.dagExecutions.findFirst({
+        where: eq(dagExecutions.id, executionId),
+      });
+
+      if (!execution) {
+        return reply.code(404).send({
+          error: `Execution with id '${executionId}' not found`,
+        });
+      }
+
+      // Check if execution can be resumed
+      if (!['suspended', 'failed'].includes(execution.status)) {
+        return reply.code(400).send({
+          error: `Cannot resume execution with status '${execution.status}'. Only 'suspended' or 'failed' executions can be resumed.`,
+          currentStatus: execution.status,
+        });
+      }
+
+      // Fetch the original DAG
+      if (!execution.dagId) {
+        return reply.code(400).send({
+          error: 'Execution has no associated DAG. Cannot resume.',
+        });
+      }
+
+      const dagRecord = await db.query.dags.findFirst({
+        where: eq(dags.id, execution.dagId),
+      });
+
+      if (!dagRecord) {
+        return reply.code(404).send({
+          error: `DAG with id '${execution.dagId}' not found`,
+        });
+      }
+
+      const job = DecomposerJobSchema.parse(dagRecord.result) as DecomposerJob;
+
+      // Update status to pending and increment retry count
+      await db.update(dagExecutions)
+        .set({
+          //status: 'pending',
+          lastRetryAt: new Date(),
+          retryCount: sql`${dagExecutions.retryCount} + 1`,
+        })
+        .where(eq(dagExecutions.id, executionId));
+
+      log.info({
+        executionId,
+        dagId: execution.dagId,
+        retryCount: execution.retryCount + 1,
+        previousStatus: execution.status,
+      }, 'Resuming DAG execution');
+
+      const dagExecutor = new DAGExecutor({
+        logger: log,
+        llmProvider,
+        toolRegistry,
+        db,
+      });
+
+      // Resume execution using same execution ID
+      // Execute async but return immediately after validation passes
+      const executePromise = dagExecutor.execute(job, executionId, execution.dagId);
+      
+      // Wait briefly to catch immediate validation errors (like missing sub-steps)
+      await Promise.race([
+        executePromise,
+        new Promise(resolve => setTimeout(resolve, 100))
+      ]).catch((error) => {
+        // If error occurs during initial validation, throw it to be caught by outer try-catch
+        throw error;
+      });
+
+      // Continue execution in background
+      executePromise.catch((error) => {
+        log.error({ err: error, executionId }, 'DAG resume failed during execution');
+      });
+
+      return reply.code(202).send({
+        status: 'resumed',
+        executionId,
+        dagId: execution.dagId,
+        retryCount: execution.retryCount + 1,
+        message: 'DAG execution resumed. Connect to SSE stream for live updates.',
+      });
+
+    } catch (error) {
+      log.error({ err: error }, 'Failed to resume DAG execution');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid parameters',
+          validation_errors: error.issues,
+        });
+      }
+
       const errorMessage = error instanceof Error ? error.message : String(error);
       
       return reply.code(500).send({
@@ -425,6 +584,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
                 usage: responseData.usage || null,
                 generationStats: responseData.generation_stats || null,
                 attempts: responseData.attempts || 0,
+                params: requestBody,
               });
 
               success = true;
@@ -697,5 +857,234 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         error: errorMessage,
       });
     }
+  });
+
+  /**
+   * DELETE /dag/:id - Delete a DAG (only if no executions exist)
+   * 
+   * @param request.params.id - The DAG ID to delete
+   * 
+   * @returns {200} Success - DAG deleted
+   * @returns {404} Not Found - DAG not found
+   * @returns {409} Conflict - DAG has existing executions
+   * @returns {500} Server Error - Deletion failed
+   */
+  fastify.delete('/dag/:id', async (request, reply) => {
+    try {
+      const paramsSchema = z.object({
+        id: z.string().min(1),
+      });
+
+      const { id } = paramsSchema.parse(request.params);
+
+      const existingDag = await db.query.dags.findFirst({
+        where: eq(dags.id, id),
+      });
+
+      if (!existingDag) {
+        return reply.code(404).send({
+          error: `DAG with id '${id}' not found`,
+        });
+      }
+
+      const relatedExecutions = await db.query.dagExecutions.findMany({
+        where: eq(dagExecutions.dagId, id),
+      });
+
+      if (relatedExecutions.length > 0) {
+        return reply.code(409).send({
+          error: `Cannot delete DAG: ${relatedExecutions.length} execution(s) exist for this DAG`,
+          dagId: id,
+          executionCount: relatedExecutions.length,
+        });
+      }
+
+      await db.delete(dags).where(eq(dags.id, id));
+
+      log.info({ dagId: id }, 'DAG deleted successfully');
+
+      return reply.code(200).send({
+        message: 'DAG deleted successfully',
+        dagId: id,
+      });
+
+    } catch (error) {
+      log.error({ err: error }, 'Failed to delete DAG');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * DELETE /dag-executions/:id - Delete a DAG execution and cascade to related sub-steps
+   * 
+   * @param request.params.id - The execution ID to delete
+   * 
+   * @returns {200} Success - Execution deleted with cascade count
+   * @returns {404} Not Found - Execution not found
+   * @returns {500} Server Error - Deletion failed
+   */
+  fastify.delete('/dag-executions/:id', async (request, reply) => {
+    try {
+      const paramsSchema = z.object({
+        id: z.string().min(1),
+      });
+
+      const { id } = paramsSchema.parse(request.params);
+
+      const existingExecution = await db.query.dagExecutions.findFirst({
+        where: eq(dagExecutions.id, id),
+      });
+
+      if (!existingExecution) {
+        return reply.code(404).send({
+          error: `DAG execution with id '${id}' not found`,
+        });
+      }
+
+      const relatedSubSteps = await db.query.subSteps.findMany({
+        where: eq(subSteps.executionId, id),
+      });
+
+      await db.delete(dagExecutions).where(eq(dagExecutions.id, id));
+
+      log.info({ 
+        executionId: id, 
+        cascadedSubSteps: relatedSubSteps.length 
+      }, 'DAG execution deleted successfully');
+
+      return reply.code(200).send({
+        message: 'DAG execution deleted successfully',
+        executionId: id,
+        cascadeInfo: {
+          relatedSubStepsDeleted: relatedSubSteps.length,
+        },
+      });
+
+    } catch (error) {
+      log.error({ err: error }, 'Failed to delete DAG execution');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * GET /dag-executions/:id/events - Server-Sent Events stream for DAG execution
+   * 
+   * @param request.params.id - The execution ID to stream events for
+   * 
+   * @returns {200} Success - SSE stream with execution events
+   * @returns {404} Not Found - Execution not found
+   */
+  fastify.get('/dag-executions/:id/events', async (request, reply) => {
+    const paramsSchema = z.object({
+      id: z.string().min(1),
+    });
+
+    let params;
+    try {
+      params = paramsSchema.parse(request.params);
+    } catch (error) {
+      return reply.code(400).send({
+        error: 'Invalid parameters',
+        validation_errors: error instanceof z.ZodError ? error.issues : [],
+      });
+    }
+
+    const { id } = params;
+
+    const execution = await db.query.dagExecutions.findFirst({
+      where: eq(dagExecutions.id, id),
+      with: {
+        subSteps: {
+          orderBy: (subSteps, { asc }) => [asc(subSteps.taskId)],
+        },
+      },
+    });
+
+    if (!execution) {
+      return reply.code(404).send({
+        error: `DAG execution with id '${id}' not found`,
+      });
+    }
+
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    const sendEvent = (event: DAGEvent) => {
+      try {
+        reply.raw.write(`event: ${event.type}\n`);
+        reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+      } catch (error) {
+        log.error({ err: error, executionId: id }, 'Failed to send SSE event');
+      }
+    };
+
+    const onEvent = (event: DAGEvent) => {
+      if (event.executionId === id) {
+        sendEvent(event);
+      }
+    };
+
+    dagEventBus.on('dag:event', onEvent);
+
+    sendEvent({
+      type: 'execution.updated',
+      executionId: id,
+      timestamp: Date.now(),
+      status: execution.status,
+      completedTasks: execution.completedTasks,
+      failedTasks: execution.failedTasks,
+      waitingTasks: execution.waitingTasks,
+    });
+
+    const heartbeatInterval = setInterval(() => {
+      try {
+        sendEvent({
+          type: 'heartbeat',
+          executionId: id,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        clearInterval(heartbeatInterval);
+      }
+    }, 15000);
+
+    request.raw.on('close', () => {
+      clearInterval(heartbeatInterval);
+      dagEventBus.off('dag:event', onEvent);
+      log.info({ executionId: id }, 'SSE connection closed');
+    });
+
+    request.raw.on('error', () => {
+      clearInterval(heartbeatInterval);
+      dagEventBus.off('dag:event', onEvent);
+    });
   });
 }

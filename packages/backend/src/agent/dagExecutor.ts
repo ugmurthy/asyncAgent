@@ -5,6 +5,7 @@ import { ToolRegistry } from './tools/index.js';
 import type { Database } from '../db/index.js';
 import { dagExecutions, subSteps, type SubStep } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { dagEventBus } from '../events/bus.js';
 
 export interface SubTask {
   id: string;
@@ -246,7 +247,7 @@ export class DAGExecutor {
     return resolvedValue;
   }
 
-  async execute(job: DecomposerJob, executionId?: string): Promise<string> {
+  async execute(job: DecomposerJob, executionId?: string, dagId?: string): Promise<string> {
     const { logger, llmProvider, toolRegistry, db } = this.config;
 
     if (job.clarification_needed) {
@@ -255,53 +256,98 @@ export class DAGExecutor {
 
     const execId = executionId || generateId('dag-exec');
     const startTime = Date.now();
+    const isResuming = !!executionId;
 
     logger.info( { 
       executionId: execId,
+      dagId,
       totalTasks: job.sub_tasks.length,
-      primaryIntent: job.intent.primary 
-    },'Starting DAG execution');
+      primaryIntent: job.intent.primary,
+      isResuming 
+    }, isResuming ? 'Resuming DAG execution' : 'Starting DAG execution');
 
     try {
-      await db.insert(dagExecutions).values({
-        id: execId,
-        originalRequest: job.original_request,
-        primaryIntent: job.intent.primary,
-        status: 'running',
-        totalTasks: job.sub_tasks.length,
-        startedAt: new Date(),
-      });
+      if (isResuming) {
+        // When resuming, verify sub-steps exist
+        const existingSubSteps = await db.query.subSteps.findMany({
+          where: eq(subSteps.executionId, execId),
+        });
 
-      await db.insert(subSteps).values(
-        job.sub_tasks.map(task => ({
-          id: generateId('sub-step'),
+        if (!existingSubSteps || existingSubSteps.length === 0) {
+          throw new Error(
+            `Cannot resume execution '${execId}': No sub-steps found. ` +
+            `The execution may not have been properly initialized or all sub-tasks were already completed.`
+          );
+        }
+
+        logger.info({ 
+          executionId: execId, 
+          subStepsCount: existingSubSteps.length 
+        }, 'Resuming execution with existing sub-steps');
+
+        // Update execution status to running
+        await db.update(dagExecutions)
+          .set({ status: 'running' })
+          .where(eq(dagExecutions.id, execId));
+
+        dagEventBus.emit('dag:event', {
+          type: 'execution.resumed',
           executionId: execId,
-          taskId: task.id,
-          description: task.description,
-          thought: task.thought,
-          actionType: task.action_type,
-          toolOrPromptName: task.tool_or_prompt.name,
-          toolOrPromptParams: task.tool_or_prompt.params || {},
-          dependencies: task.dependencies,
-          status: 'pending' as const,
-        }))
-      );
+          timestamp: Date.now(),
+          totalTasks: existingSubSteps.length,
+        });
+      } else {
+        // Create new execution
+        await db.insert(dagExecutions).values({
+          id: execId,
+          dagId: dagId || null,
+          originalRequest: job.original_request,
+          primaryIntent: job.intent.primary,
+          status: 'running',
+          totalTasks: job.sub_tasks.length,
+          startedAt: new Date(),
+        });
 
-      logger.info({ executionId: execId }, 'DAG execution record created');
+        await db.insert(subSteps).values(
+          job.sub_tasks.map(task => ({
+            id: generateId('sub-step'),
+            executionId: execId,
+            taskId: task.id,
+            description: task.description,
+            thought: task.thought,
+            actionType: task.action_type,
+            toolOrPromptName: task.tool_or_prompt.name,
+            toolOrPromptParams: task.tool_or_prompt.params || {},
+            dependencies: task.dependencies,
+            status: 'pending' as const,
+          }))
+        );
+
+        dagEventBus.emit('dag:event', {
+          type: 'execution.created',
+          executionId: execId,
+          timestamp: Date.now(),
+          totalTasks: job.sub_tasks.length,
+          originalRequest: job.original_request,
+        });
+
+        logger.info({ executionId: execId }, 'DAG execution record created');
+      }
     } catch (dbError) {
-      logger.error({ err: dbError, executionId: execId }, 'Failed to create DAG execution record');
+      logger.error({ err: dbError, executionId: execId }, 'Failed to create/resume DAG execution record');
       throw dbError;
     }
 
     const taskResults = new Map<string, any>();
     const executedTasks = new Set<string>();
 
-    const canExecute = (task: SubTask): boolean => {
-      if (task.dependencies.length === 0 || task.dependencies.includes('none')) {
-        return true;
-      }
-      return task.dependencies.every(dep => executedTasks.has(dep));
-    };
+    try {
+      const canExecute = (task: SubTask): boolean => {
+        if (task.dependencies.length === 0 || task.dependencies.includes('none')) {
+          return true;
+        }
+        return task.dependencies.every(dep => executedTasks.has(dep));
+      };
 
     const executeTask = async (task: SubTask): Promise<any> => {
       const taskStartTime = Date.now();
@@ -312,6 +358,15 @@ export class DAGExecutor {
         .set({ status: 'running', startedAt: new Date() })
         .where(eq(subSteps.taskId, task.id))
         .where(eq(subSteps.executionId, execId));
+
+      dagEventBus.emit('dag:event', {
+        type: 'substep.started',
+        executionId: execId,
+        subStepId: task.id,
+        taskId: parseInt(task.id),
+        timestamp: Date.now(),
+        description: task.description,
+      });
 
       if (task.action_type === 'tool') {
         const tool = toolRegistry.get(task.tool_or_prompt.name);
@@ -394,6 +449,16 @@ export class DAGExecutor {
               })
               .where(eq(subSteps.taskId, task.id))
               .where(eq(subSteps.executionId, execId));
+
+            dagEventBus.emit('dag:event', {
+              type: 'substep.completed',
+              executionId: execId,
+              subStepId: task.id,
+              taskId: parseInt(task.id),
+              timestamp: Date.now(),
+              durationMs: Date.now() - taskStartTime,
+              result: typeof result === 'string' ? result : JSON.stringify(result),
+            });
             
             logger.info(`Task ${task.id} completed successfully`);
           } catch (error) {
@@ -409,6 +474,15 @@ export class DAGExecutor {
               })
               .where(eq(subSteps.taskId, task.id))
               .where(eq(subSteps.executionId, execId));
+
+            dagEventBus.emit('dag:event', {
+              type: 'substep.failed',
+              executionId: execId,
+              subStepId: task.id,
+              taskId: parseInt(task.id),
+              timestamp: Date.now(),
+              error: errorMessage,
+            });
             
             throw error;
           }
@@ -448,9 +522,57 @@ export class DAGExecutor {
       })
       .where(eq(dagExecutions.id, execId));
 
-    logger.info({ executionId: execId, status: statusData.status }, 'DAG execution completed');
+    if (statusData.status === 'completed' || statusData.status === 'partial') {
+      dagEventBus.emit('dag:event', {
+        type: 'execution.completed',
+        executionId: execId,
+        timestamp: Date.now(),
+        status: statusData.status,
+        completedTasks: statusData.completedTasks,
+        failedTasks: statusData.failedTasks,
+        durationMs: Date.now() - startTime,
+        finalResult: validatedResult,
+      });
+    } else if (statusData.status === 'failed') {
+      dagEventBus.emit('dag:event', {
+        type: 'execution.failed',
+        executionId: execId,
+        timestamp: Date.now(),
+        error: 'Execution failed',
+        completedTasks: statusData.completedTasks,
+        failedTasks: statusData.failedTasks,
+      });
+    }
 
-    return validatedResult;
+      logger.info({ executionId: execId, status: statusData.status }, 'DAG execution completed');
+
+      return validatedResult;
+    } catch (error) {
+      await this.suspendExecution(execId, error);
+      throw error;
+    }
+  }
+
+  private async suspendExecution(executionId: string, error: unknown): Promise<void> {
+    const { db, logger } = this.config;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    logger.error({ executionId, err: error }, 'Suspending execution due to error');
+    
+    await db.update(dagExecutions)
+      .set({
+        status: 'suspended',
+        suspendedReason: errorMessage,
+        suspendedAt: new Date(),
+      })
+      .where(eq(dagExecutions.id, executionId));
+    
+    dagEventBus.emit('dag:event', {
+      type: 'execution.suspended',
+      executionId,
+      timestamp: Date.now(),
+      reason: errorMessage,
+    });
   }
 
   private deriveExecutionStatus(subSteps: SubStep[]): {

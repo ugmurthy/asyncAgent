@@ -92,19 +92,20 @@ export const dags = sqliteTable('dags', {
   usage: text('usage', { mode: 'json' }).$type<Record<string, any>>(),
   generationStats: text('generation_stats', { mode: 'json' }).$type<Record<string, any>>(),
   attempts: integer('attempts').notNull().default(0),
+  params: text('params', { mode: 'json' }).$type<Record<string, any>>(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 export const dagExecutions = sqliteTable('dag_executions', {
   id: text('id').primaryKey(),
-  dagId: text('dag_id').references(() => dags.id, { onDelete: 'set null' }),
+  dagId: text('dag_id').references(() => dags.id, { onDelete: 'restrict' }),
   
   originalRequest: text('original_request').notNull(),
   primaryIntent: text('primary_intent').notNull(),
   
   status: text('status', { 
-    enum: ['pending', 'running', 'waiting', 'completed', 'failed', 'partial'] 
+    enum: ['pending', 'running', 'waiting', 'completed', 'failed', 'partial', 'suspended'] 
   }).notNull().default('pending'),
   
   startedAt: integer('started_at', { mode: 'timestamp' }),
@@ -118,7 +119,12 @@ export const dagExecutions = sqliteTable('dag_executions', {
   
   finalResult: text('final_result'),
   synthesisResult: text('synthesis_result'),
-  error: text('error'),
+  
+  // Suspension and retry tracking
+  suspendedReason: text('suspended_reason'),
+  suspendedAt: integer('suspended_at', { mode: 'timestamp' }),
+  retryCount: integer('retry_count').notNull().default(0),
+  lastRetryAt: integer('last_retry_at', { mode: 'timestamp' }),
   
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),

@@ -1,0 +1,1 @@
+ALTER TABLE dags ADD `params` text;
