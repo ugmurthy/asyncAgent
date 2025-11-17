@@ -5,8 +5,8 @@ import { z } from 'zod';
 import { DAGExecutor, type DecomposerJob } from '../../agent/dagExecutor.js';
 import type { ToolRegistry } from '../../agent/tools/index.js';
 import { createLLMProvider } from '../../agent/providers/index.js';
-import { agents, dags } from '../../db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { agents, dags, dagExecutions, subSteps } from '../../db/schema.js';
+import { eq, and, desc } from 'drizzle-orm';
 
 /**
  * Extracts and parses JSON content from a markdown code block.
@@ -312,7 +312,10 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         });
       }
 
+      const executionId = generateId('dag-exec');
+      
       log.info({ 
+        executionId,
         primaryIntent: job.intent.primary,
         totalTasks: job.sub_tasks.length 
       },'Starting DAG execution');
@@ -321,11 +324,10 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         logger: log,
         llmProvider,
         toolRegistry,
+        db,
       });
 
-      const result = await dagExecutor.execute(job);
-
-      const executionId = generateId('dag-exec');
+      const result = await dagExecutor.execute(job, executionId);
 
       return reply.code(200).send({
         status: 'completed',
@@ -522,6 +524,169 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       if (error instanceof z.ZodError) {
         return reply.code(400).send({
           error: 'Invalid input parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * GET /dag-executions/:id - Get DAG execution details
+   * 
+   * @param request.params.id - The execution ID
+   * 
+   * @returns {200} Success - Execution details
+   * @returns {404} Not Found - Execution not found
+   * @returns {500} Server Error - Query failed
+   */
+  fastify.get('/dag-executions/:id', async (request, reply) => {
+    try {
+      const paramsSchema = z.object({
+        id: z.string().min(1),
+      });
+
+      const { id } = paramsSchema.parse(request.params);
+
+      const execution = await db.query.dagExecutions.findFirst({
+        where: eq(dagExecutions.id, id),
+        with: {
+          subSteps: {
+            orderBy: (subSteps, { asc }) => [asc(subSteps.taskId)],
+          },
+        },
+      });
+
+      if (!execution) {
+        return reply.code(404).send({
+          error: `DAG execution with id '${id}' not found`,
+        });
+      }
+
+      return reply.code(200).send(execution);
+
+    } catch (error) {
+      log.error({ err: error }, 'Failed to retrieve DAG execution');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * GET /dag-executions/:id/sub-steps - Get all sub-steps for an execution
+   * 
+   * @param request.params.id - The execution ID
+   * 
+   * @returns {200} Success - List of sub-steps
+   * @returns {404} Not Found - Execution not found
+   * @returns {500} Server Error - Query failed
+   */
+  fastify.get('/dag-executions/:id/sub-steps', async (request, reply) => {
+    try {
+      const paramsSchema = z.object({
+        id: z.string().min(1),
+      });
+
+      const { id } = paramsSchema.parse(request.params);
+
+      const execution = await db.query.dagExecutions.findFirst({
+        where: eq(dagExecutions.id, id),
+      });
+
+      if (!execution) {
+        return reply.code(404).send({
+          error: `DAG execution with id '${id}' not found`,
+        });
+      }
+
+      const steps = await db.query.subSteps.findMany({
+        where: eq(subSteps.executionId, id),
+        orderBy: (subSteps, { asc }) => [asc(subSteps.taskId)],
+      });
+
+      return reply.code(200).send({
+        executionId: id,
+        subSteps: steps,
+      });
+
+    } catch (error) {
+      log.error({ err: error }, 'Failed to retrieve sub-steps');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * GET /dag-executions - List all DAG executions
+   * 
+   * @param request.query.limit - Maximum number of results (default: 50)
+   * @param request.query.offset - Number of results to skip (default: 0)
+   * @param request.query.status - Filter by status (optional)
+   * 
+   * @returns {200} Success - List of executions
+   * @returns {500} Server Error - Query failed
+   */
+  fastify.get('/dag-executions', async (request, reply) => {
+    try {
+      const querySchema = z.object({
+        limit: z.coerce.number().int().min(1).max(100).default(50),
+        offset: z.coerce.number().int().min(0).default(0),
+        status: z.enum(['pending', 'running', 'waiting', 'completed', 'failed', 'partial']).optional(),
+      });
+
+      const { limit, offset, status } = querySchema.parse(request.query);
+
+      const whereConditions = status ? eq(dagExecutions.status, status) : undefined;
+
+      const executions = await db.query.dagExecutions.findMany({
+        where: whereConditions,
+        orderBy: desc(dagExecutions.createdAt),
+        limit,
+        offset,
+      });
+
+      return reply.code(200).send({
+        executions,
+        pagination: {
+          limit,
+          offset,
+          count: executions.length,
+        },
+      });
+
+    } catch (error) {
+      log.error({ err: error }, 'Failed to list DAG executions');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid query parameters',
           validation_errors: error.issues,
         });
       }

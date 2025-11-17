@@ -1,6 +1,10 @@
 import type { Logger } from '../util/logger.js';
 import type { LLMProvider } from '@async-agent/shared';
+import { generateId } from '@async-agent/shared';
 import { ToolRegistry } from './tools/index.js';
+import type { Database } from '../db/index.js';
+import { dagExecutions, subSteps, type SubStep } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
 
 export interface SubTask {
   id: string;
@@ -41,6 +45,7 @@ export interface DAGExecutorConfig {
   logger: Logger;
   llmProvider: LLMProvider;
   toolRegistry: ToolRegistry;
+  db: Database;
 }
 
 export class DAGExecutor {
@@ -241,19 +246,53 @@ export class DAGExecutor {
     return resolvedValue;
   }
 
-  async execute(job: DecomposerJob): Promise<string> {
-    const { logger, llmProvider, toolRegistry } = this.config;
+  async execute(job: DecomposerJob, executionId?: string): Promise<string> {
+    const { logger, llmProvider, toolRegistry, db } = this.config;
 
     if (job.clarification_needed) {
       throw new Error(`Clarification needed: ${job.clarification_query}`);
     }
 
+    const execId = executionId || generateId('dag-exec');
+    const startTime = Date.now();
+
     logger.info( { 
+      executionId: execId,
       totalTasks: job.sub_tasks.length,
       primaryIntent: job.intent.primary 
     },'Starting DAG execution');
 
-   
+    try {
+      await db.insert(dagExecutions).values({
+        id: execId,
+        originalRequest: job.original_request,
+        primaryIntent: job.intent.primary,
+        status: 'running',
+        totalTasks: job.sub_tasks.length,
+        startedAt: new Date(),
+      });
+
+      await db.insert(subSteps).values(
+        job.sub_tasks.map(task => ({
+          id: generateId('sub-step'),
+          executionId: execId,
+          taskId: task.id,
+          description: task.description,
+          thought: task.thought,
+          actionType: task.action_type,
+          toolOrPromptName: task.tool_or_prompt.name,
+          toolOrPromptParams: task.tool_or_prompt.params || {},
+          dependencies: task.dependencies,
+          status: 'pending' as const,
+        }))
+      );
+
+      logger.info({ executionId: execId }, 'DAG execution record created');
+    } catch (dbError) {
+      logger.error({ err: dbError, executionId: execId }, 'Failed to create DAG execution record');
+      throw dbError;
+    }
+
     const taskResults = new Map<string, any>();
     const executedTasks = new Set<string>();
 
@@ -265,10 +304,16 @@ export class DAGExecutor {
     };
 
     const executeTask = async (task: SubTask): Promise<any> => {
+      const taskStartTime = Date.now();
       logger.info({id:task.id,description:task.description},`Executing sub-task`);
       logger.info({tool_or_prompt:task.tool_or_prompt},`╰─task_or_prompt`)
+      
+      await db.update(subSteps)
+        .set({ status: 'running', startedAt: new Date() })
+        .where(eq(subSteps.taskId, task.id))
+        .where(eq(subSteps.executionId, execId));
+
       if (task.action_type === 'tool') {
-        logger.info({action_type:task.action_type,name:task.tool_or_prompt.name},' ╰─action_type,tool')
         const tool = toolRegistry.get(task.tool_or_prompt.name);
         // @TODO : Validate sub-task 
         if (!tool) {
@@ -334,13 +379,37 @@ export class DAGExecutor {
 
       await Promise.all(
         readyTasks.map(async (task) => {
+          const taskStartTime = Date.now();
           try {
             const result = await executeTask(task);
             taskResults.set(task.id, result);
             executedTasks.add(task.id);
+            
+            await db.update(subSteps)
+              .set({ 
+                status: 'completed',
+                result: result,
+                completedAt: new Date(),
+                durationMs: Date.now() - taskStartTime,
+              })
+              .where(eq(subSteps.taskId, task.id))
+              .where(eq(subSteps.executionId, execId));
+            
             logger.info(`Task ${task.id} completed successfully`);
           } catch (error) {
             logger.error({ err: error }, `Task ${task.id} failed`);
+            
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            await db.update(subSteps)
+              .set({ 
+                status: 'failed',
+                error: errorMessage,
+                completedAt: new Date(),
+                durationMs: Date.now() - taskStartTime,
+              })
+              .where(eq(subSteps.taskId, task.id))
+              .where(eq(subSteps.executionId, execId));
+            
             throw error;
           }
         })
@@ -360,7 +429,57 @@ export class DAGExecutor {
 
     const validatedResult = await this.validate(synthesisResult, logger);
 
+    const allSubSteps = await db.query.subSteps.findMany({
+      where: eq(subSteps.executionId, execId),
+    });
+
+    const statusData = this.deriveExecutionStatus(allSubSteps);
+
+    await db.update(dagExecutions)
+      .set({
+        status: statusData.status,
+        completedTasks: statusData.completedTasks,
+        failedTasks: statusData.failedTasks,
+        waitingTasks: statusData.waitingTasks,
+        finalResult: validatedResult,
+        synthesisResult: synthesisResult,
+        completedAt: new Date(),
+        durationMs: Date.now() - startTime,
+      })
+      .where(eq(dagExecutions.id, execId));
+
+    logger.info({ executionId: execId, status: statusData.status }, 'DAG execution completed');
+
     return validatedResult;
+  }
+
+  private deriveExecutionStatus(subSteps: SubStep[]): {
+    status: 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'partial';
+    completedTasks: number;
+    failedTasks: number;
+    waitingTasks: number;
+  } {
+    const completed = subSteps.filter(s => s.status === 'completed').length;
+    const failed = subSteps.filter(s => s.status === 'failed').length;
+    const running = subSteps.filter(s => s.status === 'running').length;
+    const waiting = subSteps.filter(s => s.status === 'waiting').length;
+    const total = subSteps.length;
+
+    let status: 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'partial';
+    
+    if (waiting > 0) {
+      status = 'waiting';
+    } else if (failed > 0 && completed + failed === total) {
+      status = failed === total ? 'failed' : 'partial';
+    } else if (completed === total) {
+      status = 'completed';
+    } else if (running > 0 || completed > 0) {
+      status = 'running';
+    } else {
+      status = 'pending';
+    }
+
+    return { status, completedTasks: completed, failedTasks: failed, waitingTasks: waiting };
   }
 
   private async synthesize(

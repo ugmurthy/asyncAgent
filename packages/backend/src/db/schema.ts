@@ -96,6 +96,64 @@ export const dags = sqliteTable('dags', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
+export const dagExecutions = sqliteTable('dag_executions', {
+  id: text('id').primaryKey(),
+  dagId: text('dag_id').references(() => dags.id, { onDelete: 'set null' }),
+  
+  originalRequest: text('original_request').notNull(),
+  primaryIntent: text('primary_intent').notNull(),
+  
+  status: text('status', { 
+    enum: ['pending', 'running', 'waiting', 'completed', 'failed', 'partial'] 
+  }).notNull().default('pending'),
+  
+  startedAt: integer('started_at', { mode: 'timestamp' }),
+  completedAt: integer('completed_at', { mode: 'timestamp' }),
+  durationMs: integer('duration_ms'),
+  
+  totalTasks: integer('total_tasks').notNull(),
+  completedTasks: integer('completed_tasks').notNull().default(0),
+  failedTasks: integer('failed_tasks').notNull().default(0),
+  waitingTasks: integer('waiting_tasks').notNull().default(0),
+  
+  finalResult: text('final_result'),
+  synthesisResult: text('synthesis_result'),
+  error: text('error'),
+  
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
+export const subSteps = sqliteTable('sub_steps', {
+  id: text('id').primaryKey(),
+  executionId: text('execution_id').notNull().references(() => dagExecutions.id, { onDelete: 'cascade' }),
+  
+  taskId: text('task_id').notNull(),
+  
+  description: text('description').notNull(),
+  thought: text('thought').notNull(),
+  actionType: text('action_type', { enum: ['tool', 'inference'] }).notNull(),
+  
+  toolOrPromptName: text('tool_or_prompt_name').notNull(),
+  toolOrPromptParams: text('tool_or_prompt_params', { mode: 'json' }).$type<Record<string, any>>(),
+  
+  dependencies: text('dependencies', { mode: 'json' }).notNull().$type<string[]>(),
+  
+  status: text('status', { 
+    enum: ['pending', 'running', 'waiting', 'completed', 'failed'] 
+  }).notNull().default('pending'),
+  
+  startedAt: integer('started_at', { mode: 'timestamp' }),
+  completedAt: integer('completed_at', { mode: 'timestamp' }),
+  durationMs: integer('duration_ms'),
+  
+  result: text('result', { mode: 'json' }).$type<any>(),
+  error: text('error'),
+  
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
 export type Goal = typeof goals.$inferSelect;
 export type NewGoal = typeof goals.$inferInsert;
 export type Schedule = typeof schedules.$inferSelect;
@@ -112,6 +170,10 @@ export type Agent = typeof agents.$inferSelect;
 export type NewAgent = typeof agents.$inferInsert;
 export type Dag = typeof dags.$inferSelect;
 export type NewDag = typeof dags.$inferInsert;
+export type DagExecution = typeof dagExecutions.$inferSelect;
+export type NewDagExecution = typeof dagExecutions.$inferInsert;
+export type SubStep = typeof subSteps.$inferSelect;
+export type NewSubStep = typeof subSteps.$inferInsert;
 
 // Relations
 export const goalsRelations = relations(goals, ({ one, many }) => ({
@@ -163,4 +225,19 @@ export const memoriesRelations = relations(memories, ({ one }) => ({
 
 export const agentsRelations = relations(agents, ({ many }) => ({
   goals: many(goals),
+}));
+
+export const dagExecutionsRelations = relations(dagExecutions, ({ one, many }) => ({
+  dag: one(dags, {
+    fields: [dagExecutions.dagId],
+    references: [dags.id],
+  }),
+  subSteps: many(subSteps),
+}));
+
+export const subStepsRelations = relations(subSteps, ({ one }) => ({
+  execution: one(dagExecutions, {
+    fields: [subSteps.executionId],
+    references: [dagExecutions.id],
+  }),
 }));
