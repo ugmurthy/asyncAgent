@@ -1,0 +1,42 @@
+Removing DAG_CLARIFICATION_FLOW.md
+Removing DAG_WEBAPP_IMPLEMENTATION_COMPLETE.md
+Removing DAG_WEBAPP_IMPLEMENTATION_PLAN.md
+Removing data/
+Removing mermaid/
+Removing node_modules/
+Removing packages/backend/.env
+Removing packages/backend/artifacts/
+Removing packages/backend/data/
+Removing packages/backend/dist/
+Removing packages/backend/node_modules/
+Removing packages/backend/src/types/
+Removing packages/backend/types/
+Removing packages/cli/dist/
+Removing packages/cli/node_modules/
+Removing packages/repl/dist/
+Removing packages/repl/node_modules/
+Removing packages/shared/dist/
+Removing packages/shared/js-client/dist/
+Removing packages/shared/js-client/generated/
+Removing packages/shared/js-client/node_modules/
+Removing packages/shared/node_modules/
+Removing packages/webApp/.env
+Removing packages/webApp/.svelte-kit/
+Removing packages/webApp/build/
+Removing packages/webApp/node_modules/
+Removing packages/webApp/src/lib/components/common/Mermaid.svelte
+Removing packages/webApp/src/lib/components/dags/
+Removing packages/webApp/src/lib/components/executions/
+Removing packages/webApp/src/lib/components/goals/
+Removing packages/webApp/src/lib/stores/dags.ts
+Removing packages/webApp/src/lib/stores/executions.ts
+Removing packages/webApp/src/lib/ui/label/
+Removing packages/webApp/src/routes/dags/
+Removing packages/webApp/src/routes/executions/
+Removing packages/webApp/static/
+
+NEVER Ever run git clean -fxd as it removes .gitignored files
+too
+
+
+
