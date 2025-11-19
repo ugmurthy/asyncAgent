@@ -1,172 +1,183 @@
-# Async Agent - Developer Guide
+# Async Agent - Monorepo Developer Guide
 
-## Commands
+A monorepo containing an autonomous async agent system with multi-provider LLM support.
 
-### Install Dependencies
+## Project Structure
+
+```
+asyncAgent/
+├── packages/
+│   ├── backend/       # Fastify API server, agent runtime, scheduler
+│   ├── webApp/        # SvelteKit web interface
+│   ├── cli/           # Command-line interface
+│   ├── repl/          # Interactive REPL
+│   └── shared/        # Shared types, schemas, utilities, API clients
+├── data/              # SQLite database (runtime)
+├── artifacts/         # Agent output files (runtime)
+└── scripts/           # Build and utility scripts
+```
+
+## Prerequisites
+
+- Node.js >= 18.0.0
+- pnpm >= 8.0.0
+
+## Quick Start
+
+### Installation
+
 ```bash
 pnpm install
 ```
 
-### Build
-```bash
-# Build all packages
-pnpm build
+### Environment Setup
 
-# Build specific package
-pnpm --filter @async-agent/shared build
-pnpm --filter @async-agent/backend build
-pnpm --filter @async-agent/cli build
-```
+Copy `.env.example` to `.env` in the root directory and configure your LLM provider:
 
-### Development
-
-```bash
-# Run backend in dev mode (with hot reload)
-pnpm --filter backend dev
-
-# Run CLI in dev mode
-pnpm --filter cli dev
-
-# List environment variables
-pnpm --filter backend exec tsx scripts/list-env.mjs
-```
-
-### Database
-
-```bash
-# Generate migrations (after schema changes)
-pnpm --filter backend db:generate
-
-# Push schema changes to database
-pnpm --filter backend db:push
-
-# Open Drizzle Studio (DB GUI)
-pnpm --filter backend db:studio
-```
-
-### Production
-
-```bash
-# Build all packages
-pnpm build
-
-# Start backend
-pnpm --filter backend start
-
-# Or with environment
-NODE_ENV=production pnpm --filter backend start
-```
-
-### Web Application
-
-```bash
-# Start web application in dev mode
-pnpm --filter @async-agent/webapp dev
-
-# Build web application
-pnpm --filter @async-agent/webapp build
-
-# Type check
-pnpm --filter @async-agent/webapp check
-
-# Access the web UI at http://localhost:5173
-```
-
-### CLI Usage
-
-```bash
-# Initialize configuration
-async-agent init
-
-# Manage goals
-async-agent goal create          # Create new goal
-async-agent goal list            # List all goals
-async-agent goal show <id>       # Show goal details
-async-agent goal delete <id>     # Delete a goal
-async-agent goal pause <id>      # Pause a goal
-async-agent goal resume <id>     # Resume a goal
-
-# Manage runs
-async-agent run list             # List all runs
-async-agent run show <id>        # Show run details
-async-agent run logs <id>        # View run logs/steps
-
-# Manage server
-async-agent server start         # Start backend
-async-agent server stop          # Stop backend
-async-agent server status        # Check server status
-```
-
-## Environment Setup
-
-**Important:** The backend uses dotenv to load environment variables from a `.env` file.
-
-Copy `.env.example` to `.env` in the root directory and configure:
-
-### For OpenAI
+#### OpenAI
 ```bash
 LLM_PROVIDER=openai
 OPENAI_API_KEY=sk-your-key-here
 OPENAI_MODEL=gpt-4o
 ```
 
-### For OpenRouter
+#### OpenRouter
 ```bash
 LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=sk-or-your-key-here
 OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
 ```
 
-### For Ollama (Local)
+#### Ollama (Local)
 ```bash
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=mistral
 
-# Make sure Ollama is running:
+# Ensure Ollama is running:
 # ollama serve
 # ollama pull mistral
 ```
 
-## Project Structure
+## Development Commands
 
-- `packages/shared` - Shared types, schemas, and utilities
-- `packages/backend` - Fastify API, agent runtime, scheduler
-- `packages/cli` - Command-line interface
-- `docs/` - Documentation
-- `data/` - SQLite database (created at runtime)
-- `artifacts/` - Agent output files (created at runtime)
-
-## Code Style
-
-- TypeScript strict mode enabled
-- ESM modules (not CommonJS)
-- Use `logger` for all logging (never console.log)
-- Validate inputs with Zod schemas
-- Use proper error handling with try/catch
-
-## Testing
+### Build All Packages
 
 ```bash
-# TODO: Add test commands when tests are implemented
-# pnpm test
-# pnpm --filter backend test
+# Build all packages in dependency order
+pnpm build
+
+# Run tests across all packages
+pnpm test
+
+# Run linting across all packages
+pnpm lint
+
+# Clean all build artifacts
+pnpm clean
 ```
+
+### Development Workflow
+
+```bash
+# Start backend in development mode (hot reload)
+pnpm dev
+# Or explicitly:
+pnpm --filter backend dev
+
+# Start web application in development mode
+pnpm --filter @async-agent/webapp dev
+
+# Access the web UI at http://localhost:5173
+# Backend API runs at http://localhost:3000
+```
+
+### Generate API Clients
+
+```bash
+# Generate both JS and Python API clients from OpenAPI spec
+pnpm generate
+
+# Verify generated clients match spec
+pnpm test:check-generate
+```
+
+## Package-Specific Commands
+
+### Backend
+
+```bash
+# Development
+pnpm --filter backend dev
+
+# Build
+pnpm --filter backend build
+
+# Start (production)
+pnpm --filter backend start
+
+# Testing
+pnpm --filter backend test
+pnpm --filter backend test:ui
+pnpm --filter backend test:coverage
+
+# Database
+pnpm --filter backend db:generate   # Generate migrations
+pnpm --filter backend db:push       # Push schema changes
+pnpm --filter backend db:studio     # Open Drizzle Studio
+```
+
+See [packages/backend/AGENTS.md](packages/backend/AGENTS.md) for backend-specific details.
+
+### WebApp
+
+```bash
+# Development
+pnpm --filter @async-agent/webapp dev
+
+# Build
+pnpm --filter @async-agent/webapp build
+
+# Preview production build
+pnpm --filter @async-agent/webapp preview
+
+# Type checking
+pnpm --filter @async-agent/webapp check
+pnpm --filter @async-agent/webapp check:watch
+```
+
+See [packages/webApp/AGENTS.md](packages/webApp/AGENTS.md) for webapp-specific details.
+
+## API Documentation
+
+Base URL: `http://localhost:3000/api/v1`
+
+For complete endpoint documentation including Goals, Runs, Agents, Tools, and DAG Operations, see [packages/backend/AGENTS.md](packages/backend/AGENTS.md).
+
+See [openapi.yaml](openapi.yaml) for complete API specification.
+
+## Code Style & Conventions
+
+- **TypeScript**: Strict mode enabled
+- **Modules**: ESM only (not CommonJS)
+- **Logging**: Use `logger` (never `console.log`)
+- **Validation**: Use Zod schemas for all inputs
+- **Error Handling**: Proper try/catch blocks required
 
 ## Common Issues
 
-### Port already in use
-Change `PORT` in `.env` file (default: 3000)
+### Port Already in Use
+Change `PORT` in `.env` (default: 3000)
 
-### Database locked
-Stop all running instances of the backend
+### Database Locked
+Stop all running backend instances
 
-### LLM provider errors
-- Check API keys are valid
-- For Ollama, ensure server is running: `ollama serve`
-- Verify model supports tool calling
+### LLM Provider Errors
+- Verify API keys are valid
+- For Ollama: ensure server is running (`ollama serve`)
+- Check model supports tool calling
 
-### Build errors
+### Build Errors
 ```bash
 pnpm clean
 rm -rf node_modules
@@ -174,26 +185,10 @@ pnpm install
 pnpm build
 ```
 
-## API Endpoints
+## Technology Stack
 
-Base URL: `http://localhost:3000/api/v1`
-
-### Goals
-- `POST /goals` - Create goal
-- `GET /goals` - List goals
-- `GET /goals/:id` - Get goal
-- `PATCH /goals/:id` - Update goal
-- `DELETE /goals/:id` - Delete goal
-- `POST /goals/:id/run` - Trigger run
-- `POST /goals/:id/pause` - Pause goal
-- `POST /goals/:id/resume` - Resume goal
-
-### Runs
-- `GET /runs` - List runs
-- `GET /runs/:id` - Get run
-- `GET /runs/:id/steps` - Get run steps
-- `DELETE /runs/:id` - Delete run
-
-### Health
-- `GET /health` - Basic health check
-- `GET /health/ready` - Readiness check with system status
+- **Backend**: Fastify, Drizzle ORM, SQLite, Node-cron
+- **WebApp**: SvelteKit 5, TailwindCSS, Vite
+- **Shared**: Zod, TypeScript, OpenAI SDK
+- **Testing**: Vitest
+- **Tooling**: pnpm workspaces, tsx, tsup

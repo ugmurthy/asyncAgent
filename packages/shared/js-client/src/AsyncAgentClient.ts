@@ -23,7 +23,7 @@ export class AsyncAgentClient {
     constructor(config?: Partial<OpenAPIConfig>, HttpRequest: HttpRequestConstructor = AxiosHttpRequest) {
         this.request = new HttpRequest({
             BASE: config?.BASE ?? 'http://localhost:3000/api/v1',
-            VERSION: config?.VERSION ?? '0.2.0',
+            VERSION: config?.VERSION ?? '0.3.0',
             WITH_CREDENTIALS: config?.WITH_CREDENTIALS ?? false,
             CREDENTIALS: config?.CREDENTIALS ?? 'include',
             TOKEN: config?.TOKEN,

@@ -4,7 +4,7 @@ import { generateId } from '@async-agent/shared';
 import { ToolRegistry } from './tools/index.js';
 import type { Database } from '../db/index.js';
 import { dagExecutions, subSteps, type SubStep } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { dagEventBus } from '../events/bus.js';
 
 export interface SubTask {
@@ -126,7 +126,9 @@ export class DAGExecutor {
     const DEPENDENCY_PATTERN = /<Results? (?:from|of) Task (\d+)>/g;
 
     for (const [key, value] of Object.entries(resolvedParams)) {
-      if (typeof value !== 'string') continue;
+      // followig line commented 19/Nov/25
+      // as params:urls sometime has an object (array) - we don't want that ignored 
+      //if (typeof value !== 'string') continue;
 
       //const exactMatch = value.match(/^<Results? (?:from|of) Task (\d+)>$/);
       
@@ -138,9 +140,10 @@ export class DAGExecutor {
       //   this.handleMultipleMatches(value, key, tool, taskResults, logger, resolvedParams);
       // }
 
-      if (value.match(DEPENDENCY_PATTERN)) {
+      // Following check isn't necessary : coding agent glitch 19/Nov/25
+      //if (value.match(DEPENDENCY_PATTERN)) {
          this.handleMultipleMatches(value, key, tool, taskResults, logger, resolvedParams);
-      }
+      //}
       
     }
 
@@ -164,8 +167,8 @@ export class DAGExecutor {
     if (depResult === undefined) return;
 
     const resultStr = typeof depResult === 'string' ? depResult : JSON.stringify(depResult);
-    logger.info(`╰─dependency ${key}`);
-    logger.info(`╰─dependency ${depTaskId}:${resultStr}`);
+    logger.debug(`╰─dependency ${key}`);
+    logger.debug(`╰─dependency ${depTaskId}:${resultStr}`);
     
     const isSingleParam = Object.keys(params).length === 1 || (key === 'url' && Array.isArray(depResult));
     
@@ -185,9 +188,9 @@ export class DAGExecutor {
     resolvedParams: Record<string, any>
   ): void {
     const DEPENDENCY_PATTERN = /<Results? (?:from|of) Task (\d+)>/g;
-    const matches = [...value.matchAll(DEPENDENCY_PATTERN)];
+    const matches = [...String(value).matchAll(DEPENDENCY_PATTERN)];
     
-    //logger.info(`╰─tool ${tool}`);
+    logger.debug({matches},`╰─matches ${tool}`);
 
     if (tool === 'fetchURLs') {
       resolvedParams[key] = this.resolveFetchURLs(matches, key, taskResults, logger);
@@ -267,6 +270,11 @@ export class DAGExecutor {
     }, isResuming ? 'Resuming DAG execution' : 'Starting DAG execution');
 
     try {
+      // Check if execution record already exists
+      const existingExecution = await db.query.dagExecutions.findFirst({
+        where: eq(dagExecutions.id, execId),
+      });
+
       if (isResuming) {
         // When resuming, verify sub-steps exist
         const existingSubSteps = await db.query.subSteps.findMany({
@@ -287,7 +295,7 @@ export class DAGExecutor {
 
         // Update execution status to running
         await db.update(dagExecutions)
-          .set({ status: 'running' })
+          .set({ status: 'running', startedAt: new Date() })
           .where(eq(dagExecutions.id, execId));
 
         dagEventBus.emit('dag:event', {
@@ -296,8 +304,23 @@ export class DAGExecutor {
           timestamp: Date.now(),
           totalTasks: existingSubSteps.length,
         });
+      } else if (existingExecution) {
+        // Execution record already exists (created by route), just update status to running
+        logger.info({ executionId: execId }, 'Using existing execution record, updating to running');
+        
+        await db.update(dagExecutions)
+          .set({ status: 'running', startedAt: new Date() })
+          .where(eq(dagExecutions.id, execId));
+
+        dagEventBus.emit('dag:event', {
+          type: 'execution.started',
+          executionId: execId,
+          timestamp: Date.now(),
+          totalTasks: job.sub_tasks.length,
+          originalRequest: job.original_request,
+        });
       } else {
-        // Create new execution
+        // Create new execution (fallback for backward compatibility)
         await db.insert(dagExecutions).values({
           id: execId,
           dagId: dagId || null,
@@ -356,8 +379,10 @@ export class DAGExecutor {
       
       await db.update(subSteps)
         .set({ status: 'running', startedAt: new Date() })
-        .where(eq(subSteps.taskId, task.id))
-        .where(eq(subSteps.executionId, execId));
+        .where(and(
+          eq(subSteps.taskId, task.id),
+          eq(subSteps.executionId, execId)
+        ));
 
       dagEventBus.emit('dag:event', {
         type: 'substep.started',
@@ -377,7 +402,7 @@ export class DAGExecutor {
 
         const params = task.tool_or_prompt.params || {};
         const { resolvedParams, singleDependency } = this.resolveDependencies(params, taskResults, logger,task.tool_or_prompt.name);
-
+        //logger.debug({params,resolvedParams,singleDependency},'╰─resolved')
         const validatedInput = tool.inputSchema.parse(singleDependency !== null ? singleDependency : resolvedParams);
 
         const result = await tool.execute(validatedInput, {
@@ -440,15 +465,24 @@ export class DAGExecutor {
             taskResults.set(task.id, result);
             executedTasks.add(task.id);
             
+            // Capture and serialize result immediately to avoid race conditions
+            const serializedResult = typeof result === 'string' 
+              ? result 
+              : JSON.stringify(result);
+            
+            logger.debug({taskId: task.id, result: serializedResult},`╰─task ${task.id} result after executeTask():`)
+            
             await db.update(subSteps)
               .set({ 
                 status: 'completed',
-                result: result,
+                result: serializedResult,
                 completedAt: new Date(),
                 durationMs: Date.now() - taskStartTime,
               })
-              .where(eq(subSteps.taskId, task.id))
-              .where(eq(subSteps.executionId, execId));
+              .where(and(
+                eq(subSteps.taskId, task.id),
+                eq(subSteps.executionId, execId)
+              ));
 
             dagEventBus.emit('dag:event', {
               type: 'substep.completed',
@@ -472,8 +506,10 @@ export class DAGExecutor {
                 completedAt: new Date(),
                 durationMs: Date.now() - taskStartTime,
               })
-              .where(eq(subSteps.taskId, task.id))
-              .where(eq(subSteps.executionId, execId));
+              .where(and(
+                eq(subSteps.taskId, task.id),
+                eq(subSteps.executionId, execId)
+              ));
 
             dagEventBus.emit('dag:event', {
               type: 'substep.failed',

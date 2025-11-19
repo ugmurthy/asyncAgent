@@ -93,6 +93,7 @@ export const dags = sqliteTable('dags', {
   generationStats: text('generation_stats', { mode: 'json' }).$type<Record<string, any>>(),
   attempts: integer('attempts').notNull().default(0),
   params: text('params', { mode: 'json' }).$type<Record<string, any>>(),
+  agentName: text('agent_name'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });

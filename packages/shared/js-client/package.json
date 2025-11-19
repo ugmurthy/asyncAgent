@@ -1,6 +1,6 @@
 {
   "name": "@async-agent/api-js-client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "TypeScript/JavaScript client for Async Agent API",
   "type": "module",
   "main": "./dist/index.js",

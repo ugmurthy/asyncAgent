@@ -5,12 +5,16 @@
 import type { ClarificationResponse } from '../models/ClarificationResponse.js';
 import type { CreateDAGRequest } from '../models/CreateDAGRequest.js';
 import type { CreateDAGResponse } from '../models/CreateDAGResponse.js';
+import type { DAG } from '../models/DAG.js';
 import type { DAGExecutionList } from '../models/DAGExecutionList.js';
 import type { DAGExecutionWithSteps } from '../models/DAGExecutionWithSteps.js';
+import type { DAGList } from '../models/DAGList.js';
 import type { DAGSubStepsList } from '../models/DAGSubStepsList.js';
 import type { DeleteDAGExecutionResponse } from '../models/DeleteDAGExecutionResponse.js';
 import type { ExecuteDAGResponse } from '../models/ExecuteDAGResponse.js';
+import type { MessageResponse } from '../models/MessageResponse.js';
 import type { ResumeDAGResponse } from '../models/ResumeDAGResponse.js';
+import type { UpdateDAGRequest } from '../models/UpdateDAGRequest.js';
 import type { CancelablePromise } from '../core/CancelablePromise.js';
 import type { BaseHttpRequest } from '../core/BaseHttpRequest.js';
 export class DagService {
@@ -232,6 +236,128 @@ export class DagService {
             },
             errors: {
                 404: `Resource not found`,
+            },
+        });
+    }
+    /**
+     * List all DAGs
+     * Retrieve all DAGs with optional status filtering
+     * @returns DAGList List of DAGs
+     * @throws ApiError
+     */
+    public listDags({
+        limit = 50,
+        offset,
+        status,
+    }: {
+        /**
+         * Maximum number of results (default 50)
+         */
+        limit?: number,
+        /**
+         * Number of results to skip (default 0)
+         */
+        offset?: number,
+        /**
+         * Filter by DAG status
+         */
+        status?: string,
+    }): CancelablePromise<DAGList> {
+        return this.httpRequest.request({
+            method: 'GET',
+            url: '/api/v1/dags',
+            query: {
+                'limit': limit,
+                'offset': offset,
+                'status': status,
+            },
+            errors: {
+                400: `Bad Request - validation error`,
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
+     * Get DAG by ID
+     * Retrieve a specific DAG by its ID
+     * @returns DAG DAG details
+     * @throws ApiError
+     */
+    public getDag({
+        id,
+    }: {
+        /**
+         * The DAG ID
+         */
+        id: string,
+    }): CancelablePromise<DAG> {
+        return this.httpRequest.request({
+            method: 'GET',
+            url: '/api/v1/dags/{id}',
+            path: {
+                'id': id,
+            },
+            errors: {
+                404: `Resource not found`,
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
+     * Update DAG
+     * Update DAG properties (status, result, params)
+     * @returns DAG DAG updated successfully
+     * @throws ApiError
+     */
+    public updateDag({
+        id,
+        requestBody,
+    }: {
+        /**
+         * The DAG ID
+         */
+        id: string,
+        requestBody: UpdateDAGRequest,
+    }): CancelablePromise<DAG> {
+        return this.httpRequest.request({
+            method: 'PATCH',
+            url: '/api/v1/dags/{id}',
+            path: {
+                'id': id,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Bad Request - validation error`,
+                404: `Resource not found`,
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
+     * Delete DAG
+     * Delete a DAG (only if no executions exist)
+     * @returns MessageResponse DAG deleted successfully
+     * @throws ApiError
+     */
+    public deleteDag({
+        id,
+    }: {
+        /**
+         * The DAG ID
+         */
+        id: string,
+    }): CancelablePromise<MessageResponse> {
+        return this.httpRequest.request({
+            method: 'DELETE',
+            url: '/api/v1/dags/{id}',
+            path: {
+                'id': id,
+            },
+            errors: {
+                404: `Resource not found`,
+                409: `Conflict - DAG has existing executions`,
+                500: `Internal server error`,
             },
         });
     }
