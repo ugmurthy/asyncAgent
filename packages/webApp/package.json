@@ -32,6 +32,7 @@
   "dependencies": {
     "@async-agent/api-js-client": "workspace:*",
     "@async-agent/shared": "workspace:*",
+    "mermaid": "^11.12.1",
     "svelte-markdown": "^0.4.1"
   }
 }

@@ -7,6 +7,8 @@
   import * as Tabs from "$lib/ui/tabs";
   import StatusBadge from "$lib/components/common/StatusBadge.svelte";
   import EmptyState from "$lib/components/common/EmptyState.svelte";
+  import MermaidDiagram from "$lib/components/dag/MermaidDiagram.svelte";
+  import { generateBlueprintMermaid } from "$lib/utils/mermaid";
   import { formatDate, formatRelativeTime } from "$lib/utils/formatters";
   import { apiClient } from "$lib/api/client";
   import { addNotification } from "$lib/stores/notifications";
@@ -16,6 +18,7 @@
 
   $: dag = data.dag;
   $: executions = data.executions;
+  $: blueprintChart = dag.result?.sub_tasks ? generateBlueprintMermaid(dag.result.sub_tasks) : '';
 
   function getIntent(): string {
     try {
@@ -136,6 +139,7 @@
   <Tabs.Root value="overview" class="w-full">
     <Tabs.List>
       <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
+      <Tabs.Trigger value="graph">Graph</Tabs.Trigger>
       <Tabs.Trigger value="executions">
         Executions ({executions.length})
       </Tabs.Trigger>
@@ -175,8 +179,8 @@
               <div class="text-sm font-medium text-muted-foreground">
                 Clarification needed
               </div>
-              <div title={dag?.result.clarification_needed ? "Yes" : "None"}>
-                {dag?.result.clarification_needed ? "Yes" : "None"}
+              <div title={dag?.result?.clarification_needed ? "Yes" : "None"}>
+                {dag?.result?.clarification_needed ? "Yes" : "None"}
               </div>
             </div>
             <div>
@@ -192,23 +196,40 @@
               The Request
             </div>
             <div class="p-3 bg-muted rounded-md">
-              {dag?.result.original_request}
+              {dag?.result?.original_request}
             </div>
             <div class="text-sm font-medium text-muted-foreground mb-2">
               Intent
             </div>
             <div class="p-3 bg-muted rounded-md">
-              {dag?.result.intent.primary + " :"}
+              {dag?.result?.intent?.primary + " :"}
               {getIntent()}
             </div>
           </div>
 
-          {#if dag.result?.clarification_needed}
+          {#if dag?.result?.clarification_needed}
             <div>
               <div class="text-sm font-medium text-muted-foreground mb-2">
                 Clarification Needed
               </div>
               <Badge variant="destructive">Clarification Required</Badge>
+            </div>
+          {/if}
+        </Card.Content>
+      </Card.Root>
+    </Tabs.Content>
+
+    <Tabs.Content value="graph" class="space-y-4">
+      <Card.Root>
+        <Card.Header>
+          <Card.Title>DAG Structure</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          {#if blueprintChart}
+            <MermaidDiagram chart={blueprintChart} id="blueprint-{dag.id}" />
+          {:else}
+            <div class="text-center p-8 text-muted-foreground">
+              No graph data available
             </div>
           {/if}
         </Card.Content>

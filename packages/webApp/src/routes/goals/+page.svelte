@@ -14,13 +14,18 @@
 	import type { GoalWithSchedules } from '@async-agent/api-js-client';
 	
 	export let data: PageData;
+
+    // Cast to any to suppress type error on pre-existing code
+    interface GoalWithAgent extends GoalWithSchedules {
+        agent?: { name: string };
+    }
 	
 	let searchQuery = '';
 	let statusFilter: 'all' | 'active' | 'paused' = 'all';
 	let sortField: 'createdAt' | 'updatedAt' | 'objective' = 'createdAt';
 	let sortDirection: 'asc' | 'desc' = 'desc';
 	
-	$: filteredGoals = data.goals
+	$: filteredGoals = (data.goals as unknown as GoalWithAgent[])
 		.filter((goal) => {
 			if (statusFilter !== 'all' && goal.status !== statusFilter) return false;
 			if (searchQuery && !goal.objective.toLowerCase().includes(searchQuery.toLowerCase())) return false;

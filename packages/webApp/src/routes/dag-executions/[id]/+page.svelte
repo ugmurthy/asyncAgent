@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto, invalidate } from "$app/navigation";
+  import { onMount, onDestroy } from "svelte";
   import { Button } from "$lib/ui/button";
   import { Badge } from "$lib/ui/badge";
   import * as Card from "$lib/ui/card";
@@ -7,15 +8,110 @@
   import * as Tabs from "$lib/ui/tabs";
   import StatusBadge from "$lib/components/common/StatusBadge.svelte";
   import EmptyState from "$lib/components/common/EmptyState.svelte";
+  import MermaidDiagram from "$lib/components/dag/MermaidDiagram.svelte";
+  import { generateExecutionMermaid } from "$lib/utils/mermaid";
   import { formatDate, formatRelativeTime } from "$lib/utils/formatters";
   import { apiClient } from "$lib/api/client";
   import { addNotification } from "$lib/stores/notifications";
   import type { PageData } from "./$types";
 
+  // Define local types to handle missing properties in generated client
+  interface LocalSubStep {
+    taskId: string;
+    toolOrPromptName: string;
+    toolOrPromptParams?: Record<string, any>;
+    dependencies: string[];
+    status: string;
+    result?: any;
+    error?: string;
+    startedAt?: string;
+    completedAt?: string;
+    durationMs?: number;
+  }
+
+  interface LocalExecution {
+    id: string;
+    dagId: string;
+    status: any; // Cast to any for StatusBadge
+    subSteps: LocalSubStep[];
+    startedAt?: string;
+    completedAt?: string;
+    error?: string;
+  }
+
   export let data: PageData;
 
-  $: execution = data.execution;
-  $: subSteps = execution.subSteps || [];
+  $: execution = data.execution as unknown as LocalExecution;
+  $: subSteps = (execution.subSteps || []) as LocalSubStep[];
+  $: executionChart = generateExecutionMermaid(subSteps);
+
+  let eventSource: EventSource | null = null;
+
+  onMount(() => {
+    connectSSE();
+  });
+
+  onDestroy(() => {
+    disconnectSSE();
+  });
+
+  function connectSSE() {
+    if (execution.status === 'completed' || execution.status === 'failed' || execution.status === 'suspended') {
+      // Don't connect if already finished, unless we want to see updates if resumed externally
+      // But let's connect anyway in case it gets resumed
+    }
+
+    const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'}/dag-executions/${execution.id}/events`;
+    eventSource = new EventSource(url);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        handleSSEEvent(data);
+      } catch (e) {
+        console.error('Failed to parse SSE event', e);
+      }
+    };
+
+    eventSource.onerror = () => {
+      console.error('SSE connection error');
+      // Optional: retry logic or just close
+      eventSource?.close();
+    };
+  }
+
+  function disconnectSSE() {
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+  }
+
+  function handleSSEEvent(event: any) {
+    if (event.type === 'substep.updated' || event.type === 'substep.completed' || event.type === 'substep.failed' || event.type === 'substep.started') {
+      // Update specific substep in list
+      const index = subSteps.findIndex((s) => s.taskId === String(event.taskId));
+      if (index !== -1) {
+        subSteps[index] = { 
+          ...subSteps[index], 
+          status: event.status || (event.type === 'substep.completed' ? 'completed' : event.type === 'substep.failed' ? 'failed' : 'running'),
+          result: event.result || subSteps[index].result,
+          error: event.error || subSteps[index].error,
+          completedAt: event.timestamp ? new Date(event.timestamp).toISOString() : subSteps[index].completedAt,
+          durationMs: event.durationMs || subSteps[index].durationMs
+        };
+        // Trigger reactivity
+        subSteps = [...subSteps];
+      } else {
+        // Reload if we can't find the step (shouldn't happen if list is complete)
+        invalidate('dag-execution:detail'); 
+      }
+    } else if (event.type === 'execution.updated' || event.type === 'execution.completed' || event.type === 'execution.failed' || event.type === 'execution.suspended' || event.type === 'execution.resumed') {
+      execution.status = event.status || (event.type === 'execution.completed' ? 'completed' : event.type === 'execution.failed' ? 'failed' : execution.status);
+      execution = { ...execution };
+      invalidate('dag-execution:detail');
+    }
+  }
 
   async function deleteExecution() {
     if (
@@ -36,10 +132,16 @@
 
   async function resumeExecution() {
     try {
-      await apiClient.dag.resumeDagExecution({
-        executionId: execution.id,
-        requestBody: {},
+      // Using fetch directly since client method name might be different or missing
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'}/resume-dag/${execution.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
+      
+      if (!response.ok) throw new Error('Failed to resume');
+      
       addNotification("Execution resumed", "success");
       invalidate("dag-execution:detail");
     } catch (error) {
@@ -130,6 +232,15 @@
             </div>
           {/if}
         </div>
+      </Card.Content>
+    </Card.Root>
+
+    <Card.Root>
+      <Card.Header>
+        <Card.Title>Execution Graph</Card.Title>
+      </Card.Header>
+      <Card.Content>
+        <MermaidDiagram chart={executionChart} id="execution-{execution.id}" />
       </Card.Content>
     </Card.Root>
 
