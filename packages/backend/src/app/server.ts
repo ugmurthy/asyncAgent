@@ -13,6 +13,7 @@ import { runsRoutes } from './routes/runs.js';
 import { agentsRoutes } from './routes/agents.js';
 import { dagRoutes } from './routes/dag.js';
 import { toolsRoutes } from './routes/tools.js';
+import { artifactsRoutes } from './routes/artifacts.js';
 import { seedDefaultAgent } from '../db/seed.js';
 
 const fastify = Fastify({
@@ -66,6 +67,7 @@ await fastify.register(goalsRoutes, { prefix: '/api/v1', scheduler });
 await fastify.register(runsRoutes, { prefix: '/api/v1' });
 await fastify.register(dagRoutes, { prefix: '/api/v1', llmProvider, toolRegistry: defaultToolRegistry });
 await fastify.register(toolsRoutes, { prefix: '/api/v1', toolRegistry: defaultToolRegistry });
+await fastify.register(artifactsRoutes, { prefix: '/api/v1' });
 
 // Start server
 const start = async () => {

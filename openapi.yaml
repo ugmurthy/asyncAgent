@@ -33,6 +33,8 @@ tags:
     description: Tool registry and definitions
   - name: dag
     description: DAG (Directed Acyclic Graph) creation and execution
+  - name: artifacts
+    description: Access to generated artifacts
 
 paths:
   /health:
@@ -665,6 +667,37 @@ paths:
                     items:
                       $ref: "#/components/schemas/ToolDefinition"
                   - $ref: "#/components/schemas/ToolDefinition"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/artifacts/{filename}:
+    get:
+      tags:
+        - artifacts
+      summary: Get artifact content
+      description: Retrieve the content of a generated artifact file
+      operationId: getArtifact
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          description: Name of the artifact file
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Artifact content
+          content:
+            text/plain:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: object
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -2188,6 +2221,15 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
           example:
             error: Invalid request parameters
+
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: Access denied
 
     NotFound:
       description: Resource not found

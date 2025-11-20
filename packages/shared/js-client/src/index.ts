@@ -55,6 +55,7 @@ export type { UpdateDAGRequest } from './models/UpdateDAGRequest.js';
 export type { UpdateGoalRequest } from './models/UpdateGoalRequest.js';
 
 export { AgentsService } from './services/AgentsService.js';
+export { ArtifactsService } from './services/ArtifactsService.js';
 export { DagService } from './services/DagService.js';
 export { GoalsService } from './services/GoalsService.js';
 export { HealthService } from './services/HealthService.js';

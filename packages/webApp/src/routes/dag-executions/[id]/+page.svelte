@@ -9,6 +9,7 @@
   import StatusBadge from "$lib/components/common/StatusBadge.svelte";
   import EmptyState from "$lib/components/common/EmptyState.svelte";
   import MermaidDiagram from "$lib/components/dag/MermaidDiagram.svelte";
+  import SvelteMarkdown from "svelte-markdown";
   import { generateExecutionMermaid } from "$lib/utils/mermaid";
   import { formatDate, formatRelativeTime } from "$lib/utils/formatters";
   import { apiClient } from "$lib/api/client";
@@ -44,6 +45,65 @@
   $: execution = data.execution as unknown as LocalExecution;
   $: subSteps = (execution.subSteps || []) as LocalSubStep[];
   $: executionChart = generateExecutionMermaid(subSteps);
+
+  let markdownContent: string | null = null;
+  let showResults = false;
+  let loadingResults = false;
+  let lastProcessedResult: any = null;
+
+  $: lastStep = subSteps.length > 0 ? subSteps[subSteps.length - 1] : null;
+  
+  $: if (lastStep && lastStep.status === 'completed' && lastStep.result !== lastProcessedResult) {
+    lastProcessedResult = lastStep.result;
+    fetchResultContent(lastStep.result);
+  }
+
+  async function fetchResultContent(result: any) {
+    if (!result) return;
+    
+    let path = '';
+    let content = '';
+    
+    // Handle object result (already parsed)
+    if (typeof result === 'object' && result !== null) {
+      if ('path' in result) {
+        path = result.path;
+      } else {
+        content = JSON.stringify(result, null, 2);
+      }
+    } 
+    // Handle string result (might be JSON string or plain text)
+    else if (typeof result === 'string') {
+      try {
+        const parsed = JSON.parse(result);
+        if (typeof parsed === 'object' && parsed !== null && 'path' in parsed) {
+          path = parsed.path;
+        } else {
+          // If it's valid JSON but not our path object, treat as string content if it was a string originally
+          // But if it was a JSON string representation of an object, maybe we want to show it as code?
+          // requirement: "if there is no json object ... use the result itself"
+          // If result is "{\"foo\":\"bar\"}", parsed is {foo:bar}.
+          // If result is "Just text", parse throws.
+          content = result;
+        }
+      } catch {
+        content = result;
+      }
+    }
+
+    if (path) {
+      loadingResults = true;
+      try {
+        markdownContent = await apiClient.artifacts.getArtifact({ filename: path });
+      } catch (e) {
+        markdownContent = `Failed to load artifact: ${path} (${e})`;
+      } finally {
+        loadingResults = false;
+      }
+    } else {
+      markdownContent = content;
+    }
+  }
 
   let eventSource: EventSource | null = null;
 
@@ -233,6 +293,32 @@
           {/if}
         </div>
       </Card.Content>
+    </Card.Root>
+
+    <Card.Root>
+      <Card.Header>
+        <div class="flex items-center justify-between cursor-pointer" onclick={() => showResults = !showResults}>
+            <Card.Title>Results of Execution</Card.Title>
+            <Button variant="ghost" size="sm">
+                {showResults ? 'Collapse' : 'Expand'}
+            </Button>
+        </div>
+      </Card.Header>
+      {#if showResults}
+        <Card.Content>
+            {#if loadingResults}
+                <div class="flex justify-center p-4">
+                    <span class="loading loading-spinner loading-md">Loading...</span>
+                </div>
+            {:else if markdownContent}
+                <div class="prose max-w-none dark:prose-invert p-4 bg-gray-50 rounded-lg border">
+                    <SvelteMarkdown source={markdownContent} />
+                </div>
+            {:else}
+                <p class="text-gray-500 italic">No results available.</p>
+            {/if}
+        </Card.Content>
+      {/if}
     </Card.Root>
 
     <Card.Root>
