@@ -27,7 +27,9 @@ fastify.decorate('db', db);
 await fastify.register(cors, {
   origin: ['https://local.drizzle.studio','http://localhost:5174','http://localhost:5173','null'],
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  exposedHeaders: ['Content-Type', 'Cache-Control']
 });
 await fastify.register(rateLimit, {
   max: 100,

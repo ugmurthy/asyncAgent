@@ -54,7 +54,7 @@ export function generateExecutionMermaid(subSteps: any[]): string {
       durationText = ` (${(step.durationMs / 1000).toFixed(1)}s)`;
     }
 
-    graph += `  ${step.taskId}["${step.taskId}: ${label}${durationText}"]\n`;
+    graph += `  ${step.taskId}["${step.taskId}: ${durationText} ${label}"]\n`;
     graph += `  class ${step.taskId} ${status}\n`;
     
     // Optional: Click event handling requires special setup in mermaid, 

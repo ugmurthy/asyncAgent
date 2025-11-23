@@ -7,6 +7,7 @@
   import { dag as dagApi, agents as agentsApi } from "$lib/api/client";
   import { addNotification } from "$lib/stores/notifications";
   import { onMount } from "svelte";
+  import { page } from "$app/stores";
   import type { Agent } from "@async-agent/api-js-client";
 
   let goalText = "";
@@ -25,6 +26,11 @@
   let errors: Record<string, string> = {};
 
   onMount(async () => {
+    const initialGoal = $page.url.searchParams.get("initialGoal");
+    if (initialGoal) {
+      goalText = initialGoal;
+    }
+
     try {
       loadingAgents = true;
       const response = await agentsApi.listAgents({});

@@ -10,6 +10,11 @@ const getBaseUrl = (): string => {
 	return process.env.API_BASE_URL || 'http://localhost:3000';
 };
 
+// Get full API base URL with /api/v1 prefix
+export const getApiBaseUrl = (): string => {
+	return `${getBaseUrl()}/api/v1`;
+};
+
 // Create singleton API client instance
 export const apiClient = new AsyncAgentClient({
 	BASE: getBaseUrl()

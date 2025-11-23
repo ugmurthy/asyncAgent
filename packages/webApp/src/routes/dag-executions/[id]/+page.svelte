@@ -9,10 +9,10 @@
   import StatusBadge from "$lib/components/common/StatusBadge.svelte";
   import EmptyState from "$lib/components/common/EmptyState.svelte";
   import MermaidDiagram from "$lib/components/dag/MermaidDiagram.svelte";
-  import SvelteMarkdown from "svelte-markdown";
+  import MarkdownRenderer from "$lib/components/common/MarkdownRenderer.svelte";
   import { generateExecutionMermaid } from "$lib/utils/mermaid";
   import { formatDate, formatRelativeTime } from "$lib/utils/formatters";
-  import { apiClient } from "$lib/api/client";
+  import { apiClient, getApiBaseUrl } from "$lib/api/client";
   import { addNotification } from "$lib/stores/notifications";
   import type { PageData } from "./$types";
 
@@ -40,43 +40,61 @@
     error?: string;
   }
 
-  export let data: PageData;
+  let { data }: { data: PageData } = $props();
 
-  $: execution = data.execution as unknown as LocalExecution;
-  $: subSteps = (execution.subSteps || []) as LocalSubStep[];
-  $: executionChart = generateExecutionMermaid(subSteps);
+  let execution = $state(data.execution as unknown as LocalExecution);
 
-  let markdownContent: string | null = null;
-  let showResults = false;
-  let loadingResults = false;
-  let lastProcessedResult: any = null;
+  // Update local state when data changes (e.g. navigation)
+  $effect(() => {
+    if (data.execution.id !== execution.id) {
+      execution = data.execution as unknown as LocalExecution;
+    }
+  });
 
-  $: lastStep = subSteps.length > 0 ? subSteps[subSteps.length - 1] : null;
-  
-  $: if (lastStep && lastStep.status === 'completed' && lastStep.result !== lastProcessedResult) {
-    lastProcessedResult = lastStep.result;
-    fetchResultContent(lastStep.result);
-  }
+  let subSteps = $derived((execution.subSteps || []) as LocalSubStep[]);
+  let executionChart = $derived(generateExecutionMermaid(subSteps));
+
+  let markdownContent = $state<string | null>(null);
+  let showResults = $state(false);
+  let loadingResults = $state(false);
+  let lastProcessedResult = $state<any>(null);
+  let events = $state<any[]>([]);
+  let eventsContainer: HTMLDivElement | null = null;
+
+  let lastStep = $derived(
+    subSteps.length > 0 ? subSteps[subSteps.length - 1] : null
+  );
+
+  $effect(() => {
+    if (
+      lastStep &&
+      lastStep.status === "completed" &&
+      lastStep.result !== lastProcessedResult
+    ) {
+      lastProcessedResult = lastStep.result;
+      fetchResultContent(lastStep.result);
+    }
+  });
 
   async function fetchResultContent(result: any) {
     if (!result) return;
-    
-    let path = '';
-    let content = '';
-    
+
+    let path = "";
+    let content = "";
+
     // Handle object result (already parsed)
-    if (typeof result === 'object' && result !== null) {
-      if ('path' in result) {
+    if (typeof result === "object" && result !== null) {
+      if ("path" in result) {
         path = result.path;
       } else {
         content = JSON.stringify(result, null, 2);
       }
-    } 
+    }
     // Handle string result (might be JSON string or plain text)
-    else if (typeof result === 'string') {
+    else if (typeof result === "string") {
       try {
         const parsed = JSON.parse(result);
-        if (typeof parsed === 'object' && parsed !== null && 'path' in parsed) {
+        if (typeof parsed === "object" && parsed !== null && "path" in parsed) {
           path = parsed.path;
         } else {
           // If it's valid JSON but not our path object, treat as string content if it was a string originally
@@ -94,7 +112,9 @@
     if (path) {
       loadingResults = true;
       try {
-        markdownContent = await apiClient.artifacts.getArtifact({ filename: path });
+        markdownContent = await apiClient.artifacts.getArtifact({
+          filename: path,
+        });
       } catch (e) {
         markdownContent = `Failed to load artifact: ${path} (${e})`;
       } finally {
@@ -116,26 +136,38 @@
   });
 
   function connectSSE() {
-    if (execution.status === 'completed' || execution.status === 'failed' || execution.status === 'suspended') {
-      // Don't connect if already finished, unless we want to see updates if resumed externally
-      // But let's connect anyway in case it gets resumed
-    }
-
-    const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'}/dag-executions/${execution.id}/events`;
+    const url = `${getApiBaseUrl()}/dag-executions/${execution.id}/events`;
     eventSource = new EventSource(url);
 
-    eventSource.onmessage = (event) => {
+    const handleRawEvent = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
         handleSSEEvent(data);
       } catch (e) {
-        console.error('Failed to parse SSE event', e);
+        console.error("Failed to parse SSE event", e, event.data);
       }
     };
 
-    eventSource.onerror = () => {
-      console.error('SSE connection error');
-      // Optional: retry logic or just close
+    // Subscribe to all named SSE event types from backend
+    const eventTypes = [
+      "execution.created",
+      "execution.updated",
+      "execution.completed",
+      "execution.failed",
+      "execution.suspended",
+      "execution.started",
+      "execution.resumed",
+      "substep.started",
+      "substep.completed",
+      "substep.failed",
+    ];
+
+    for (const type of eventTypes) {
+      eventSource.addEventListener(type, handleRawEvent);
+    }
+
+    eventSource.onerror = (err) => {
+      console.error("SSE connection error", err);
       eventSource?.close();
     };
   }
@@ -148,28 +180,65 @@
   }
 
   function handleSSEEvent(event: any) {
-    if (event.type === 'substep.updated' || event.type === 'substep.completed' || event.type === 'substep.failed' || event.type === 'substep.started') {
+    // Add event to events stream
+    events = [
+      ...events,
+      { ...event, timestamp: event.timestamp || new Date().toISOString() },
+    ];
+
+    // Auto-scroll to bottom
+    if (eventsContainer) {
+      setTimeout(() => {
+        eventsContainer?.scrollTo({
+          top: eventsContainer.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 100);
+    }
+
+    if (event.type.startsWith("substep.")) {
       // Update specific substep in list
-      const index = subSteps.findIndex((s) => s.taskId === String(event.taskId));
+      const currentSteps = [...(execution.subSteps || [])];
+      const index = currentSteps.findIndex(
+        (s) => s.taskId === String(event.taskId)
+      );
+
       if (index !== -1) {
-        subSteps[index] = { 
-          ...subSteps[index], 
-          status: event.status || (event.type === 'substep.completed' ? 'completed' : event.type === 'substep.failed' ? 'failed' : 'running'),
-          result: event.result || subSteps[index].result,
-          error: event.error || subSteps[index].error,
-          completedAt: event.timestamp ? new Date(event.timestamp).toISOString() : subSteps[index].completedAt,
-          durationMs: event.durationMs || subSteps[index].durationMs
+        currentSteps[index] = {
+          ...currentSteps[index],
+          status:
+            event.status ||
+            (event.type === "substep.completed"
+              ? "completed"
+              : event.type === "substep.failed"
+                ? "failed"
+                : "running"),
+          result: event.result ?? currentSteps[index].result,
+          error: event.error ?? currentSteps[index].error,
+          completedAt: event.timestamp
+            ? new Date(event.timestamp).toISOString()
+            : currentSteps[index].completedAt,
+          durationMs: event.durationMs ?? currentSteps[index].durationMs,
         };
-        // Trigger reactivity
-        subSteps = [...subSteps];
+
+        // Direct property write triggers reactivity clearly
+        execution.subSteps = currentSteps;
       } else {
         // Reload if we can't find the step (shouldn't happen if list is complete)
-        invalidate('dag-execution:detail'); 
+        invalidate("dag-execution:detail");
       }
-    } else if (event.type === 'execution.updated' || event.type === 'execution.completed' || event.type === 'execution.failed' || event.type === 'execution.suspended' || event.type === 'execution.resumed') {
-      execution.status = event.status || (event.type === 'execution.completed' ? 'completed' : event.type === 'execution.failed' ? 'failed' : execution.status);
-      execution = { ...execution };
-      invalidate('dag-execution:detail');
+    } else if (event.type.startsWith("execution.")) {
+      const newStatus =
+        event.status ||
+        (event.type === "execution.completed"
+          ? "completed"
+          : event.type === "execution.failed"
+            ? "failed"
+            : execution.status);
+
+      // Direct property write triggers reactivity clearly
+      execution.status = newStatus;
+      invalidate("dag-execution:detail");
     }
   }
 
@@ -193,15 +262,18 @@
   async function resumeExecution() {
     try {
       // Using fetch directly since client method name might be different or missing
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'}/resume-dag/${execution.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
+      const response = await fetch(
+        `${getApiBaseUrl()}/resume-dag/${execution.id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
-      });
-      
-      if (!response.ok) throw new Error('Failed to resume');
-      
+      );
+
+      if (!response.ok) throw new Error("Failed to resume");
+
       addNotification("Execution resumed", "success");
       invalidate("dag-execution:detail");
     } catch (error) {
@@ -285,6 +357,7 @@
                 : "Not completed"}
             </p>
           </div>
+
           {#if execution.error}
             <div class="col-span-2">
               <p class="text-sm font-medium text-gray-500">Error</p>
@@ -292,41 +365,97 @@
             </div>
           {/if}
         </div>
+        <div>
+          <p class="pt-4">Requested Task</p>
+          <hr />
+          <p class="text-sm">
+            {execution.originalRequest}
+          </p>
+        </div>
       </Card.Content>
     </Card.Root>
 
     <Card.Root>
       <Card.Header>
-        <div class="flex items-center justify-between cursor-pointer" onclick={() => showResults = !showResults}>
-            <Card.Title>Results of Execution</Card.Title>
-            <Button variant="ghost" size="sm">
-                {showResults ? 'Collapse' : 'Expand'}
-            </Button>
+        <div
+          class="flex items-center justify-between cursor-pointer"
+          onclick={() => (showResults = !showResults)}
+        >
+          <Card.Title>Results of Execution</Card.Title>
+          <Button variant="ghost" size="sm">
+            {showResults ? "Collapse" : "Expand"}
+          </Button>
         </div>
       </Card.Header>
       {#if showResults}
         <Card.Content>
-            {#if loadingResults}
-                <div class="flex justify-center p-4">
-                    <span class="loading loading-spinner loading-md">Loading...</span>
-                </div>
-            {:else if markdownContent}
-                <div class="prose max-w-none dark:prose-invert p-4 bg-gray-50 rounded-lg border">
-                    <SvelteMarkdown source={markdownContent} />
-                </div>
-            {:else}
-                <p class="text-gray-500 italic">No results available.</p>
-            {/if}
+          {#if loadingResults}
+            <div class="flex justify-center p-4">
+              <span class="loading loading-spinner loading-md">Loading...</span>
+            </div>
+          {:else if markdownContent}
+            <div
+              class="prose max-w-none dark:prose-invert p-4 bg-gray-50 rounded-lg border"
+            >
+              <MarkdownRenderer source={markdownContent} />
+            </div>
+          {:else}
+            <p class="text-gray-500 italic">No results available.</p>
+          {/if}
         </Card.Content>
       {/if}
     </Card.Root>
 
     <Card.Root>
       <Card.Header>
-        <Card.Title>Execution Graph</Card.Title>
+        <Card.Title>Execution Flow</Card.Title>
       </Card.Header>
       <Card.Content>
         <MermaidDiagram chart={executionChart} id="execution-{execution.id}" />
+      </Card.Content>
+    </Card.Root>
+
+    <Card.Root>
+      <Card.Header>
+        <Card.Title>Events Stream</Card.Title>
+        <Card.Description>Real-time execution events</Card.Description>
+      </Card.Header>
+      <Card.Content>
+        <div
+          bind:this={eventsContainer}
+          class="h-96 overflow-y-auto border rounded-lg bg-gray-50 p-4 space-y-2"
+        >
+          {#if events.length === 0}
+            <p class="text-gray-500 italic text-sm">Waiting for events...</p>
+          {:else}
+            {#each events as event}
+              <div
+                class="border-l-4 border-blue-500 bg-white p-3 rounded shadow-sm"
+              >
+                <div class="flex items-start justify-between mb-1">
+                  <Badge
+                    class={event.type.includes("failed")
+                      ? "bg-red-100 text-red-800"
+                      : event.type.includes("completed")
+                        ? "bg-green-100 text-green-800"
+                        : "bg-blue-100 text-blue-800"}
+                  >
+                    {event.type}
+                  </Badge>
+                  <span class="text-xs text-gray-500">
+                    {formatRelativeTime(event.timestamp)}
+                  </span>
+                </div>
+                <pre
+                  class="text-xs overflow-x-auto bg-gray-50 p-2 rounded mt-2">{JSON.stringify(
+                    event,
+                    null,
+                    2
+                  )}</pre>
+              </div>
+            {/each}
+          {/if}
+        </div>
       </Card.Content>
     </Card.Root>
 

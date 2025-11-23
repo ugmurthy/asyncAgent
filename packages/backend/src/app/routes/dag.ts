@@ -341,8 +341,11 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       }
 
       log.info({ dagId }, 'Retrieved DAG for execution');
-
-      const job = DecomposerJobSchema.parse(dagRecord.result) as DecomposerJob;
+      let resultStr = JSON.stringify(dagRecord.result)
+                        .replace(/\{\{currentDate\}\}/g, new Date().toLocaleString())
+                        .replace(/\{\{Today\}\}/gi, new Date().toLocaleString());;
+      log.debug({result:JSON.parse(resultStr)},'Placeholder replaced')
+      const job = DecomposerJobSchema.parse(JSON.parse(resultStr)) as DecomposerJob;
 
       if (job.clarification_needed) {
         return reply.code(200).send({
@@ -1118,6 +1121,8 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
       'X-Accel-Buffering': 'no',
+      'Access-Control-Allow-Origin': request.headers.origin || '*',
+      'Access-Control-Allow-Credentials': 'true',
     });
 
     const sendEvent = (event: DAGEvent) => {

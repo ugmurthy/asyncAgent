@@ -145,6 +145,18 @@
     // DAGs don't have schedules - return N/A for now
     return "N/A";
   }
+
+  function useThisDag(dag: DAG) {
+    // params might be saved with camelCase (goalText) or kebab-case (goal-text)
+    // @ts-ignore
+    const goalText = dag.params?.goalText || dag.params?.["goal-text"] || "";
+    
+    if (goalText) {
+      goto(`/dags/new?initialGoal=${encodeURIComponent(goalText)}`);
+    } else {
+      addNotification("Could not retrieve goal text from this DAG", "error");
+    }
+  }
 </script>
 
 <svelte:head>
@@ -265,6 +277,9 @@
                       </DropdownMenu.Item>
                       <DropdownMenu.Item onclick={() => executeDag(dag.id)}>
                         Execute DAG
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item onclick={() => useThisDag(dag)}>
+                        Use this DAG
                       </DropdownMenu.Item>
                       <DropdownMenu.Separator />
                       {#if dag.status === "active"}

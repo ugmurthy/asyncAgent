@@ -13,12 +13,15 @@
   import { apiClient } from "$lib/api/client";
   import { addNotification } from "$lib/stores/notifications";
   import type { PageData } from "./$types";
+  import type { ExecuteDAGResponse } from "@async-agent/api-js-client";
 
   export let data: PageData;
 
   $: dag = data.dag;
   $: executions = data.executions;
-  $: blueprintChart = dag.result?.sub_tasks ? generateBlueprintMermaid(dag.result.sub_tasks) : '';
+  $: blueprintChart = dag.result?.sub_tasks
+    ? generateBlueprintMermaid(dag.result.sub_tasks)
+    : "";
 
   function getIntent(): string {
     try {
@@ -34,9 +37,12 @@
 
   async function executeDag() {
     try {
-      await apiClient.dag.executeDag({ requestBody: { dagId: dag.id } });
+      const execution = await apiClient.dag.executeDag({
+        requestBody: { dagId: dag.id },
+      });
       addNotification("DAG execution started", "success");
-      setTimeout(() => invalidate("dags:detail"), 500);
+      console.log("Execution response ", execution);
+      goto(`/dag-executions/${execution.executionId}`);
     } catch (error) {
       addNotification("Failed to execute DAG", "error");
     }
@@ -259,7 +265,10 @@
             </Table.Header>
             <Table.Body>
               {#each executions as execution (execution.id)}
-                <Table.Row>
+                <Table.Row
+                  class="cursor-pointer"
+                  onclick={() => goto(`/dag-executions/${execution.id}`)}
+                >
                   <Table.Cell class="font-mono text-xs font-thin">
                     {execution.id}
                   </Table.Cell>
@@ -291,7 +300,10 @@
                       <Button
                         variant="ghost"
                         size="sm"
-                        onclick={() => goto(`/dag-executions/${execution.id}`)}
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          goto(`/dag-executions/${execution.id}`);
+                        }}
                       >
                         View
                       </Button>
@@ -299,7 +311,10 @@
                         variant="ghost"
                         size="sm"
                         class="text-destructive"
-                        onclick={() => deleteExecution(execution.id)}
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          deleteExecution(execution.id);
+                        }}
                       >
                         Delete
                       </Button>
