@@ -2,6 +2,7 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
+import multipart from '@fastify/multipart';
 import { logger } from '../util/logger.js';
 import { env } from '../util/env.js';
 import { db, closeDatabase } from '../db/client.js';
@@ -14,6 +15,7 @@ import { agentsRoutes } from './routes/agents.js';
 import { dagRoutes } from './routes/dag.js';
 import { toolsRoutes } from './routes/tools.js';
 import { artifactsRoutes } from './routes/artifacts.js';
+import { taskRoutes } from './routes/task.js';
 import { seedDefaultAgent } from '../db/seed.js';
 
 const fastify = Fastify({
@@ -34,6 +36,11 @@ await fastify.register(cors, {
 await fastify.register(rateLimit, {
   max: 100,
   timeWindow: '1 minute',
+});
+await fastify.register(multipart, {
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
 });
 
 // Initialize LLM provider and validate
@@ -70,6 +77,7 @@ await fastify.register(runsRoutes, { prefix: '/api/v1' });
 await fastify.register(dagRoutes, { prefix: '/api/v1', llmProvider, toolRegistry: defaultToolRegistry });
 await fastify.register(toolsRoutes, { prefix: '/api/v1', toolRegistry: defaultToolRegistry });
 await fastify.register(artifactsRoutes, { prefix: '/api/v1' });
+await fastify.register(taskRoutes, { prefix: '/api/v1' });
 
 // Start server
 const start = async () => {

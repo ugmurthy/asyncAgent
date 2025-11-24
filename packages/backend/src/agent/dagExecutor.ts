@@ -22,6 +22,7 @@ export interface SubTask {
 
 export interface DecomposerJob {
   original_request: string;
+  title: string,
   intent: {
     primary: string;
     sub_intents: string[];

@@ -35,6 +35,8 @@ tags:
     description: DAG (Directed Acyclic Graph) creation and execution
   - name: artifacts
     description: Access to generated artifacts
+  - name: task
+    description: Execute agent tasks with multipart file uploads
 
 paths:
   /health:
@@ -1088,6 +1090,112 @@ paths:
                     type: string
                   executionCount:
                     type: integer
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/task:
+    post:
+      tags:
+        - task
+      summary: Execute an agent task
+      description: Execute a task using an agent with multipart file upload support
+      operationId: executeTask
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - taskName
+                - prompt
+              properties:
+                taskName:
+                  type: string
+                  description: Name of the agent/task to execute
+                  example: code-reviewer
+                prompt:
+                  type: string
+                  description: The prompt/instruction for the agent
+                  example: Review this code for best practices
+                params:
+                  type: string
+                  description: JSON string with optional parameters (max_tokens, temperature, reasoning_effort)
+                  example: '{"max_tokens": 2000, "temperature": 0.7, "reasoning_effort": "medium"}'
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Files to attach to the task
+      responses:
+        "200":
+          description: Task executed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - taskName
+                  - agentName
+                  - agentVersion
+                  - response
+                properties:
+                  taskName:
+                    type: string
+                  agentName:
+                    type: string
+                  agentVersion:
+                    type: string
+                  inputFiles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        filename:
+                          type: string
+                        mimeType:
+                          type: string
+                  response:
+                    type: string
+                  usage:
+                    type: object
+                    properties:
+                      promptTokens:
+                        type: integer
+                      completionTokens:
+                        type: integer
+                      totalTokens:
+                        type: integer
+                  finishReason:
+                    type: string
+                  reasoning:
+                    type: string
+                  params:
+                    type: object
+                    properties:
+                      provider:
+                        type: string
+                      model:
+                        type: string
+                      max_tokens:
+                        type: integer
+                      temperature:
+                        type: number
+                      reasoning_effort:
+                        type: string
+                        enum: [low, medium, high]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: Agent not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
         "500":
           $ref: "#/components/responses/InternalServerError"
 

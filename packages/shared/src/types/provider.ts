@@ -25,10 +25,20 @@ export interface LLMResponse {
   reasoning?: string;
 }
 
+export type MessageContent = 
+  | string 
+  | Array<{
+      type: 'text' | 'image_url';
+      text?: string;
+      image_url?: {
+        url: string;
+      };
+    }>;
+
 export interface ChatParams {
   messages: Array<{
     role: 'system' | 'user' | 'assistant';
-    content: string;
+    content: MessageContent;
   }>;
   temperature?: number;
   maxTokens?: number;
