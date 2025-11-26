@@ -22,6 +22,10 @@
   let temperature = 0.7;
   let maxTokens: number | undefined = undefined;
 
+  // Scheduling settings
+  let cronSchedule = "";
+  let scheduleActive = false;
+
   let isSubmitting = false;
   let errors: Record<string, string> = {};
 
@@ -82,8 +86,20 @@
       
       if (provider) requestBody.provider = provider;
       if (model) requestBody.model = model;
-      if (temperature !== 0.7) requestBody.temperature = temperature;
-      if (maxTokens) requestBody.max_tokens = maxTokens;
+      
+      // Convert numeric fields to numbers (HTML inputs return strings)
+      const tempNum = Number(temperature);
+      if (!Number.isNaN(tempNum) && tempNum !== 0.7) {
+        requestBody.temperature = tempNum;
+      }
+      
+      const maxTokensNum = Number(maxTokens);
+      if (!Number.isNaN(maxTokensNum) && maxTokensNum > 0) {
+        requestBody.max_tokens = maxTokensNum;
+      }
+      
+      if (cronSchedule) requestBody.cronSchedule = cronSchedule;
+      if (scheduleActive) requestBody.scheduleActive = scheduleActive;
 
       const response = await dagApi.createDag({ requestBody });
 
@@ -168,7 +184,9 @@
               bind:value={agentName}
               class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             >
-              <option value="" disabled>Select an agent...</option>
+              {#if !agentName}
+                <option value="" disabled selected>Select an agent...</option>
+              {/if}
               {#each agents as agent}
                 <option value={agent.name}>
                   {agent.name} (v{agent.version}) {agent.active ? "" : "(Inactive)"}
@@ -179,6 +197,40 @@
           {#if errors.agentName}
             <p class="text-sm text-destructive">{errors.agentName}</p>
           {/if}
+        </div>
+      </Card.Content>
+    </Card.Root>
+
+    <Card.Root>
+      <Card.Header>
+        <Card.Title>Schedule Settings (Optional)</Card.Title>
+        <Card.Description>
+          Set up a cron schedule to automatically execute this DAG at specified times
+        </Card.Description>
+      </Card.Header>
+      <Card.Content class="space-y-4">
+        <div class="space-y-2">
+          <label for="cronSchedule" class="text-sm font-medium">Cron Schedule</label>
+          <Input
+            id="cronSchedule"
+            bind:value={cronSchedule}
+            placeholder="e.g., 0 9 * * * (daily at 9am)"
+          />
+          <p class="text-xs text-muted-foreground">
+            Examples: "0 9 * * *" (daily at 9am), "0 */6 * * *" (every 6 hours)
+          </p>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="scheduleActive"
+            bind:checked={scheduleActive}
+            class="h-4 w-4 rounded border-gray-300"
+          />
+          <label for="scheduleActive" class="text-sm font-medium">
+            Activate schedule immediately
+          </label>
         </div>
       </Card.Content>
     </Card.Root>

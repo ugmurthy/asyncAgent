@@ -1730,6 +1730,14 @@ components:
         seed:
           type: integer
           description: Random seed for reproducibility
+        cronSchedule:
+          type: string
+          description: Optional cron expression for scheduled execution (e.g., "0 9 * * *" for daily at 9am)
+          example: "0 9 * * *"
+        scheduleActive:
+          type: boolean
+          description: Whether to activate the cron schedule
+          default: false
 
     CreateDAGResponse:
       type: object
@@ -1965,6 +1973,19 @@ components:
           type: string
           nullable: true
           description: Name of the agent used
+        dagTitle:
+          type: string
+          nullable: true
+          description: Generated title for the DAG from TitleMaster agent
+        cronSchedule:
+          type: string
+          nullable: true
+          description: Optional cron expression for scheduled execution (e.g., "0 9 * * *" for daily at 9am)
+          example: "0 9 * * *"
+        scheduleActive:
+          type: boolean
+          description: Whether the cron schedule is active
+          default: false
         createdAt:
           type: string
           format: date-time
@@ -2010,6 +2031,15 @@ components:
           type: object
           additionalProperties: true
           description: Updated params
+        dagTitle:
+          type: string
+          description: Updated DAG title
+        cronSchedule:
+          type: string
+          description: Updated cron schedule expression
+        scheduleActive:
+          type: boolean
+          description: Whether to activate/deactivate the schedule
       additionalProperties: false
 
     DAGExecution:

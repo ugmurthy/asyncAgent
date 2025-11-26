@@ -6,7 +6,7 @@ import { WriteFileTool } from './writeFile.js';
 import { ReadFileTool } from './readFile.js';
 import { SendWebhookTool } from './sendWebhook.js';
 import { SendEmailTool } from './sendEmail.js';
-import { LlmExecuteTool } from './llmExecute.js';
+//import { LlmExecuteTool } from './llmExecute.js';
 
 export class ToolRegistry {
   private tools = new Map<string, Tool>();
@@ -23,7 +23,7 @@ export class ToolRegistry {
     this.register(new ReadFileTool());
     this.register(new SendWebhookTool());
     this.register(new SendEmailTool());
-    this.register(new LlmExecuteTool());
+    //this.register(new LlmExecuteTool());
   }
 
   register(tool: Tool): void {

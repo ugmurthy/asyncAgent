@@ -11,6 +11,7 @@ import { DagService } from './services/DagService.js';
 import { GoalsService } from './services/GoalsService.js';
 import { HealthService } from './services/HealthService.js';
 import { RunsService } from './services/RunsService.js';
+import { TaskService } from './services/TaskService.js';
 import { ToolsService } from './services/ToolsService.js';
 type HttpRequestConstructor = new (config: OpenAPIConfig) => BaseHttpRequest;
 export class AsyncAgentClient {
@@ -20,6 +21,7 @@ export class AsyncAgentClient {
     public readonly goals: GoalsService;
     public readonly health: HealthService;
     public readonly runs: RunsService;
+    public readonly task: TaskService;
     public readonly tools: ToolsService;
     public readonly request: BaseHttpRequest;
     constructor(config?: Partial<OpenAPIConfig>, HttpRequest: HttpRequestConstructor = AxiosHttpRequest) {
@@ -40,6 +42,7 @@ export class AsyncAgentClient {
         this.goals = new GoalsService(this.request);
         this.health = new HealthService(this.request);
         this.runs = new RunsService(this.request);
+        this.task = new TaskService(this.request);
         this.tools = new ToolsService(this.request);
     }
 }

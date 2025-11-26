@@ -61,7 +61,7 @@
       if (!dag.result?.intent) return "N/A";
       const result =
         typeof dag.result.intent.primary === "string"
-          ? dag.result.intent.sub_intents
+          ? dag.result.intent.primary
           : "?";
       return result || "N/A";
     } catch {

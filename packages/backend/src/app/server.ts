@@ -9,6 +9,7 @@ import { db, closeDatabase } from '../db/client.js';
 import { createLLMProvider, validateLLMSetup } from '../agent/providers/index.js';
 import { defaultToolRegistry } from '../agent/tools/index.js';
 import { CronScheduler } from '../scheduler/cron.js';
+import { DAGScheduler } from '../scheduler/dag-scheduler.js';
 import { goalsRoutes } from './routes/goals.js';
 import { runsRoutes } from './routes/runs.js';
 import { agentsRoutes } from './routes/agents.js';
@@ -47,8 +48,15 @@ await fastify.register(multipart, {
 const llmProvider = createLLMProvider();
 await validateLLMSetup(llmProvider, env.LLM_MODEL);
 
-// Initialize scheduler
+// Initialize schedulers
 const scheduler = new CronScheduler({
+  db,
+  logger,
+  llmProvider,
+  toolRegistry: defaultToolRegistry,
+});
+
+const dagScheduler = new DAGScheduler({
   db,
   logger,
   llmProvider,
@@ -66,6 +74,7 @@ fastify.get('/health/ready', async () => {
     provider: env.LLM_PROVIDER,
     model: env.LLM_MODEL,
     scheduler: scheduler.getStats(),
+    dagScheduler: dagScheduler.getStats(),
     timestamp: new Date().toISOString(),
   };
 });
@@ -74,7 +83,7 @@ fastify.get('/health/ready', async () => {
 await fastify.register(agentsRoutes, { prefix: '/api/v1' });
 await fastify.register(goalsRoutes, { prefix: '/api/v1', scheduler });
 await fastify.register(runsRoutes, { prefix: '/api/v1' });
-await fastify.register(dagRoutes, { prefix: '/api/v1', llmProvider, toolRegistry: defaultToolRegistry });
+await fastify.register(dagRoutes, { prefix: '/api/v1', llmProvider, toolRegistry: defaultToolRegistry, dagScheduler });
 await fastify.register(toolsRoutes, { prefix: '/api/v1', toolRegistry: defaultToolRegistry });
 await fastify.register(artifactsRoutes, { prefix: '/api/v1' });
 await fastify.register(taskRoutes, { prefix: '/api/v1' });
@@ -88,13 +97,15 @@ const start = async () => {
     // Seed default agent
     await seedDefaultAgent();
     
-    // Start scheduler
+    // Start schedulers
     await scheduler.start();
+    await dagScheduler.start();
     
     await fastify.listen({ port, host });
     logger.info(`Server listening on ${host}:${port}`);
     logger.info(`LLM Provider: ${env.LLM_PROVIDER} (${env.LLM_MODEL})`);
     logger.info(`Scheduler: ${scheduler.getStats().activeSchedules} active schedules`);
+    logger.info(`DAG Scheduler: ${dagScheduler.getStats().activeSchedules} active schedules`);
   } catch (err) {
     logger.error({ err }, 'Failed to start server');
     process.exit(1);
@@ -107,8 +118,9 @@ signals.forEach((signal) => {
   process.on(signal, async () => {
     logger.info(`Received ${signal}, shutting down gracefully...`);
     
-    // Stop scheduler
+    // Stop schedulers
     await scheduler.stop();
+    await dagScheduler.stop();
     
     // Close server
     await fastify.close();

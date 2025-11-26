@@ -15,5 +15,17 @@ export type UpdateDAGRequest = {
      * Updated params
      */
     params?: Record<string, any>;
+    /**
+     * Updated DAG title
+     */
+    dagTitle?: string;
+    /**
+     * Updated cron schedule expression
+     */
+    cronSchedule?: string;
+    /**
+     * Whether to activate/deactivate the schedule
+     */
+    scheduleActive?: boolean;
 };
 

@@ -94,6 +94,9 @@ export const dags = sqliteTable('dags', {
   attempts: integer('attempts').notNull().default(0),
   params: text('params', { mode: 'json' }).$type<Record<string, any>>(),
   agentName: text('agent_name'),
+  dagTitle: text('dag_title'),
+  cronSchedule: text('cron_schedule'),
+  scheduleActive: integer('schedule_active', { mode: 'boolean' }).notNull().default(sql`0`),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });

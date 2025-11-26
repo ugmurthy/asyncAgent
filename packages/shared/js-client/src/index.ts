@@ -60,4 +60,5 @@ export { DagService } from './services/DagService.js';
 export { GoalsService } from './services/GoalsService.js';
 export { HealthService } from './services/HealthService.js';
 export { RunsService } from './services/RunsService.js';
+export { TaskService } from './services/TaskService.js';
 export { ToolsService } from './services/ToolsService.js';

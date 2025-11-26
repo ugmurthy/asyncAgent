@@ -31,5 +31,13 @@ export type CreateDAGRequest = {
      * Random seed for reproducibility
      */
     seed?: number;
+    /**
+     * Optional cron expression for scheduled execution (e.g., "0 9 * * *" for daily at 9am)
+     */
+    cronSchedule?: string;
+    /**
+     * Whether to activate the cron schedule
+     */
+    scheduleActive?: boolean;
 };
 

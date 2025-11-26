@@ -35,6 +35,18 @@ export type DAG = {
      * Name of the agent used
      */
     agentName?: string | null;
+    /**
+     * Generated title for the DAG from TitleMaster agent
+     */
+    dagTitle?: string | null;
+    /**
+     * Optional cron expression for scheduled execution (e.g., "0 9 * * *" for daily at 9am)
+     */
+    cronSchedule?: string | null;
+    /**
+     * Whether the cron schedule is active
+     */
+    scheduleActive?: boolean;
     createdAt: string;
     updatedAt: string;
 };

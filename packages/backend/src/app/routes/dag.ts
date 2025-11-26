@@ -8,6 +8,7 @@ import { createLLMProvider } from '../../agent/providers/index.js';
 import { agents, dags, dagExecutions, subSteps } from '../../db/schema.js';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { dagEventBus, type DAGEvent } from '../../events/bus.js';
+import { validateCronExpression } from '../../utils/cron-validator.js';
 
 /**
  * Extracts and parses JSON content from a markdown code block.
@@ -72,11 +73,12 @@ const DecomposerJobSchema = z.object({
 interface DAGRoutesOptions {
   llmProvider: LLMProvider;
   toolRegistry: ToolRegistry;
+  dagScheduler?: any;
 }
 
 export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOptions) {
   const { log, db } = fastify;
-  const { llmProvider, toolRegistry } = options;
+  const { llmProvider, toolRegistry, dagScheduler } = options;
 
   /**
    * POST /create-dag - Create a DAG (Directed Acyclic Graph) from a goal description
@@ -105,11 +107,28 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         max_tokens: z.number().optional(),
         temperature: z.number().optional(),
         seed: z.number().optional(),
+        cronSchedule: z.string().optional(),
+        scheduleActive: z.boolean().optional(),
       });
 
       const body = inputSchema.parse(request.body);
       const goalText = body['goal-text'];
       const agentName = body.agentName;
+
+      // Validate cron schedule if provided
+      if (body.cronSchedule) {
+        const validation = validateCronExpression(body.cronSchedule);
+        if (!validation.valid) {
+          return reply.code(400).send({
+            error: 'Invalid cron expression',
+            details: validation.error,
+          });
+        }
+        log.info({ 
+          cronSchedule: body.cronSchedule, 
+          nextRuns: validation.nextRuns 
+        }, 'Valid cron schedule provided');
+      }
 
       // Determine which LLM provider to use
       let activeLLMProvider: LLMProvider;
@@ -243,6 +262,38 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
 
         if (dag.validation.coverage === 'high') {
           const dagId = generateId();
+          
+          // Call POST /task with TitleMaster to generate dag_title
+          let dagTitle: string | null = null;
+          try {
+            ///////
+            const requestBody = {
+              prompt: goalText,
+              taskName:'TitleMaster'
+            };
+
+            log.info({ requestBody }, 'DAG TitleMaster request body');
+          
+            ///////
+
+            
+            const titleResponse = await fastify.inject({
+              method: 'POST',
+              url: '/api/v1/task',
+              payload: requestBody
+            });
+            
+            if (titleResponse.statusCode === 200) {
+              const titleData = titleResponse.json();
+              dagTitle = titleData.response || null;
+              log.info({ dagTitle }, 'Generated DAG title from TitleMaster');
+            } else {
+              log.warn({ statusCode: titleResponse.statusCode }, 'Failed to generate DAG title');
+            }
+          } catch (titleError) {
+            log.error({ err: titleError }, 'Error calling TitleMaster');
+          }
+          
           await db.insert(dags).values({
             id: dagId,
             status: 'success',
@@ -251,6 +302,9 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
             generationStats: generation_stats,
             attempts: attempt,
             agentName,
+            dagTitle,
+            cronSchedule: body.cronSchedule || null,
+            scheduleActive: body.scheduleActive ?? false,
             params: {
               goalText,
               agentName,
@@ -262,7 +316,23 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
             },
           });
 
-          log.info({ dagId,agentName, goalText: showGoalText }, 'DAG saved to database');
+          log.info({ 
+            dagId, 
+            agentName, 
+            goalText: showGoalText,
+            cronSchedule: body.cronSchedule,
+            scheduleActive: body.scheduleActive 
+          }, 'DAG saved to database');
+
+          // Register with scheduler if schedule is active
+          if (dagScheduler && body.cronSchedule && body.scheduleActive) {
+            dagScheduler.registerDAGSchedule({
+              id: dagId,
+              cronSchedule: body.cronSchedule,
+              scheduleActive: body.scheduleActive,
+            });
+            log.info({ dagId, cronSchedule: body.cronSchedule }, 'DAG schedule registered');
+          }
 
           return reply.code(200).send({
             status: 'success',
@@ -1205,8 +1275,15 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         offset,
       });
 
+      // Ensure dates are serializable
+      const serializedDags = dagList.map(dag => ({
+        ...dag,
+        createdAt: dag.createdAt?.toISOString(),
+        updatedAt: dag.updatedAt?.toISOString(),
+      }));
+
       return reply.code(200).send({
-        dags: dagList,
+        dags: serializedDags,
         pagination: {
           limit,
           offset,
@@ -1301,10 +1378,23 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         status: z.string().optional(),
         result: z.record(z.any()).optional(),
         params: z.record(z.any()).optional(),
+        cronSchedule: z.string().optional(),
+        scheduleActive: z.boolean().optional(),
       });
 
       const { id } = paramsSchema.parse(request.params);
       const updateData = bodySchema.parse(request.body);
+
+      // Validate cron schedule if being updated
+      if (updateData.cronSchedule) {
+        const validation = validateCronExpression(updateData.cronSchedule);
+        if (!validation.valid) {
+          return reply.code(400).send({
+            error: 'Invalid cron expression',
+            details: validation.error,
+          });
+        }
+      }
 
       const existingDag = await db.query.dags.findFirst({
         where: eq(dags.id, id),
@@ -1326,6 +1416,20 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       const updatedDag = await db.query.dags.findFirst({
         where: eq(dags.id, id),
       });
+
+      // Update scheduler if schedule fields changed
+      if (dagScheduler && (updateData.cronSchedule !== undefined || updateData.scheduleActive !== undefined)) {
+        const finalSchedule = updateData.cronSchedule ?? updatedDag?.cronSchedule;
+        const finalActive = updateData.scheduleActive ?? updatedDag?.scheduleActive;
+        
+        if (finalSchedule && finalActive) {
+          dagScheduler.updateDAGSchedule(id, finalSchedule, finalActive);
+          log.info({ dagId: id, cronSchedule: finalSchedule, scheduleActive: finalActive }, 'DAG schedule updated');
+        } else {
+          dagScheduler.unregisterDAGSchedule(id);
+          log.info({ dagId: id }, 'DAG schedule unregistered');
+        }
+      }
 
       log.info({ dagId: id, updates: Object.keys(updateData) }, 'DAG updated successfully');
 
