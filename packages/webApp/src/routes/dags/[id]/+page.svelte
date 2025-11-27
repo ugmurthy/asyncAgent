@@ -199,7 +199,7 @@
 
           <div>
             <div class="text-sm font-medium text-muted-foreground mb-2">
-              The Request
+              {dag?.dagTitle}
             </div>
             <div class="p-3 bg-muted rounded-md">
               {dag?.result?.original_request}

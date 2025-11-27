@@ -5,6 +5,7 @@
   import { Badge } from "$lib/ui/badge";
   import * as Table from "$lib/ui/table";
   import * as DropdownMenu from "$lib/ui/dropdown-menu";
+  import * as Dialog from "$lib/ui/dialog";
   import StatusBadge from "$lib/components/common/StatusBadge.svelte";
   import EmptyState from "$lib/components/common/EmptyState.svelte";
   import {
@@ -17,6 +18,7 @@
   import { addNotification } from "$lib/stores/notifications";
   import type { PageData } from "./$types";
   import type { DAG } from "@async-agent/api-js-client";
+  //import { scheduler } from "timers/promises";
 
   export let data: PageData;
 
@@ -24,6 +26,14 @@
   let statusFilter: "all" | "active" | "paused" = "all";
   let sortField: "createdAt" | "updatedAt" | "intent" = "createdAt";
   let sortDirection: "asc" | "desc" = "desc";
+
+  let editingDag: DAG | null = null;
+  let isEditOpen = false;
+  let editForm = {
+    dagTitle: "",
+    cronSchedule: "",
+    scheduleActive: false,
+  };
 
   $: filteredDags = data.dags
     .filter((dag) => {
@@ -142,7 +152,10 @@
   }
 
   function getScheduleDisplay(dag: DAG): string {
-    // DAGs don't have schedules - return N/A for now
+    const d = dag as any;
+    if (d.scheduleActive && d.cronSchedule) {
+      return d.cronSchedule;
+    }
     return "N/A";
   }
 
@@ -150,11 +163,50 @@
     // params might be saved with camelCase (goalText) or kebab-case (goal-text)
     // @ts-ignore
     const goalText = dag.params?.goalText || dag.params?.["goal-text"] || "";
-    
+
     if (goalText) {
       goto(`/dags/new?initialGoal=${encodeURIComponent(goalText)}`);
     } else {
       addNotification("Could not retrieve goal text from this DAG", "error");
+    }
+  }
+
+  function getGoalText(dag: DAG): string {
+    // @ts-ignore
+    return dag.params?.goalText || dag.params?.["goal-text"] || getIntent(dag);
+  }
+
+  function openEditDag(dag: DAG) {
+    editingDag = dag;
+    editForm = {
+      dagTitle: (dag as any).dagTitle || "",
+      cronSchedule: (dag as any).cronSchedule || "",
+      scheduleActive: (dag as any).scheduleActive || false,
+    };
+    isEditOpen = true;
+  }
+
+  async function saveEditDag() {
+    if (!editingDag) return;
+
+    try {
+      await apiClient.dag.updateDag({
+        id: editingDag.id,
+        requestBody: {
+          dagTitle: editForm.dagTitle,
+          cronSchedule: editForm.cronSchedule,
+          scheduleActive: editForm.scheduleActive,
+        } as any,
+      });
+      addNotification("DAG updated successfully", "success");
+      isEditOpen = false;
+      editingDag = null;
+      invalidate("dags:list");
+      const dagsList = await apiClient.dag.listDags({});
+      data.dags = dagsList.dags || [];
+    } catch (error) {
+      console.error("Failed to update DAG:", error);
+      addNotification("Failed to update DAG", "error");
     }
   }
 </script>
@@ -210,9 +262,9 @@
     <div class="border rounded-lg">
       <Table.Root>
         <Table.Header>
-          <Table.Row>
-            <Table.Head>Job</Table.Head>
-            <Table.Head>Clarification</Table.Head>
+          <Table.Row class="bg-gray-200 rouded-t-lg ">
+            <Table.Head>Title</Table.Head>
+            <Table.Head>Intent</Table.Head>
 
             <Table.Head>Agent</Table.Head>
             <Table.Head>Schedule</Table.Head>
@@ -228,15 +280,11 @@
             >
               <Table.Cell class="font-medium max-w-md">
                 <div class="truncate" title={getIntent(dag)}>
-                  {truncate(getIntent(dag), 80)}
+                  {(dag as any).dagTitle}
                 </div>
               </Table.Cell>
               <Table.Cell>
-                {#if getClarificationNeeded(dag)}
-                  <Badge variant="destructive">Required</Badge>
-                {:else}
-                  <Badge variant="secondary">None</Badge>
-                {/if}
+                {getIntent(dag)}
               </Table.Cell>
 
               <Table.Cell>
@@ -278,6 +326,9 @@
                       <DropdownMenu.Item onclick={() => executeDag(dag.id)}>
                         Execute DAG
                       </DropdownMenu.Item>
+                      <DropdownMenu.Item onclick={() => openEditDag(dag)}>
+                        Edit DAG
+                      </DropdownMenu.Item>
                       <DropdownMenu.Item onclick={() => useThisDag(dag)}>
                         Use this DAG
                       </DropdownMenu.Item>
@@ -308,4 +359,67 @@
       </Table.Root>
     </div>
   {/if}
+
+  <Dialog.Root bind:open={isEditOpen}>
+    <Dialog.Content class="sm:max-w-[425px]">
+      <Dialog.Header>
+        <Dialog.Title>Edit DAG</Dialog.Title>
+        <Dialog.Description>
+          Make changes to the DAG configuration here.
+        </Dialog.Description>
+      </Dialog.Header>
+
+      {#if editingDag}
+        <div class="grid gap-4 py-4">
+          <div class="grid gap-2">
+            <label for="edit-goal" class="text-sm font-medium"
+              >Goal / Intent</label
+            >
+            <div
+              id="edit-goal"
+              class="text-sm text-muted-foreground bg-muted p-2 rounded-md max-h-32 overflow-y-auto"
+            >
+              {getGoalText(editingDag)}
+            </div>
+          </div>
+
+          <div class="grid gap-2">
+            <label for="edit-title" class="text-sm font-medium">DAG Title</label
+            >
+            <Input id="edit-title" bind:value={editForm.dagTitle} />
+          </div>
+
+          <div class="grid gap-2">
+            <label for="edit-cron" class="text-sm font-medium"
+              >Cron Schedule</label
+            >
+            <Input
+              id="edit-cron"
+              bind:value={editForm.cronSchedule}
+              placeholder="0 9 * * *"
+            />
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="edit-active"
+              bind:checked={editForm.scheduleActive}
+              class="h-4 w-4 rounded border-gray-300"
+            />
+            <label for="edit-active" class="text-sm font-medium">
+              Schedule Active
+            </label>
+          </div>
+        </div>
+      {/if}
+
+      <Dialog.Footer>
+        <Button variant="outline" onclick={() => (isEditOpen = false)}
+          >Cancel</Button
+        >
+        <Button onclick={saveEditDag}>Save changes</Button>
+      </Dialog.Footer>
+    </Dialog.Content>
+  </Dialog.Root>
 </div>

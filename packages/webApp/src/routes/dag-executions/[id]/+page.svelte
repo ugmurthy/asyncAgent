@@ -476,7 +476,9 @@
           <Table.Root>
             <Table.Header>
               <Table.Row>
-                <Table.Head>Task ID (tool) deps</Table.Head>
+                <Table.Head class="text-left"
+                  >Task (Tool) Dependent/s</Table.Head
+                >
                 <Table.Head>Status</Table.Head>
                 <Table.Head>Started At</Table.Head>
                 <Table.Head>Completed At</Table.Head>

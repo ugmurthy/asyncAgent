@@ -86,7 +86,7 @@ export class LlmExecuteTool extends BaseTool<LlmExecuteInput, LlmExecuteOutput> 
     ctx.logger.info({
       provider: input.provider,
       model: input.model,
-      task: input.task,
+      //task: input.task,
       hasAttachments: !!input.attachments?.length,
     }, 'Executing LLM call');
 

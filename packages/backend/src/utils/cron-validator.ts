@@ -1,4 +1,4 @@
-import parser from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 
 export interface CronValidationResult {
   valid: boolean;
@@ -17,7 +17,7 @@ export function validateCronExpression(
   previewCount: number = 3
 ): CronValidationResult {
   try {
-    const interval = parser.parseExpression(cronExpression);
+    const interval = CronExpressionParser.parse(cronExpression);
     const nextRuns: Date[] = [];
 
     for (let i = 0; i < previewCount; i++) {
