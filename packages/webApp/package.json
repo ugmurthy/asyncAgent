@@ -41,6 +41,7 @@
     "mermaid": "^11.12.1",
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0",
+    "svelte-jsoneditor": "^3.10.0",
     "svelte-markdown": "^0.4.1",
     "svelte-marked": "^0.8.0"
   }
