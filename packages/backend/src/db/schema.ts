@@ -23,6 +23,7 @@ export const schedules = sqliteTable('schedules', {
   cronExpr: text('cron_expr').notNull(),
   timezone: text('timezone').notNull().default('UTC'),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  lastRunAt: integer('last_run_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
@@ -97,6 +98,8 @@ export const dags = sqliteTable('dags', {
   dagTitle: text('dag_title'),
   cronSchedule: text('cron_schedule'),
   scheduleActive: integer('schedule_active', { mode: 'boolean' }).notNull().default(sql`0`),
+  lastRunAt: integer('last_run_at', { mode: 'timestamp' }),
+  timezone: text('timezone').notNull().default('UTC'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });

@@ -120,19 +120,23 @@ backend/
 ├── src/
 │   ├── app/
 │   │   ├── server.ts          # Main server entry point
-│   │   ├── routes/            # API route handlers
-│   │   └── config/            # Configuration
+│   │   └── routes/            # API route handlers
 │   ├── agent/
-│   │   ├── runtime.ts         # Agent execution engine
+│   │   ├── orchestrator.ts    # Agent orchestration
+│   │   ├── planner.ts         # Task planning
+│   │   ├── dagExecutor.ts     # DAG execution engine
 │   │   ├── tools/             # Tool definitions
-│   │   └── prompts/           # Agent prompts
+│   │   └── providers/         # LLM providers
 │   ├── db/
 │   │   ├── schema.ts          # Database schema
 │   │   └── queries.ts         # Database queries
+│   ├── events/
+│   │   └── bus.ts             # Event bus
 │   ├── scheduler/
 │   │   └── cron-scheduler.ts  # Cron job scheduler
-│   └── llm/
-│       └── provider.ts        # LLM provider factory
+│   └── util/
+│       ├── env.ts             # Environment variables
+│       └── logger.ts          # Logger configuration
 ├── dist/                      # Build output
 ├── data/                      # SQLite database files
 ├── scripts/                   # Utility scripts
@@ -194,6 +198,14 @@ Base URL: `http://localhost:3000/api/v1`
 - `GET /api/v1/dag-executions/:id/sub-steps` - Get all sub-steps for a DAG execution
 - `GET /api/v1/dag-executions/:id/events` - Stream DAG execution events (SSE)
 
+### Task Execution
+
+- `POST /api/v1/task` - Execute a task with an agent and optional file attachments
+
+### Artifacts
+
+- `GET /artifacts/:filename` - Retrieve a specific artifact file
+
 See [../../openapi.yaml](../../openapi.yaml) for complete API specification.
 
 ## Database Schema
@@ -236,7 +248,7 @@ Uses Drizzle ORM with SQLite for persistence:
 Uses Pino for structured logging:
 
 ```typescript
-import { logger } from './utils/logger.js';
+import { logger } from './util/logger.js';
 
 logger.info('Message');
 logger.error({ err, context }, 'Error occurred');

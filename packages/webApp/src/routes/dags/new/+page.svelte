@@ -25,6 +25,7 @@
   // Scheduling settings
   let cronSchedule = "";
   let scheduleActive = false;
+  let timezone = "Asia/Kolkata";
 
   let isSubmitting = false;
   let errors: Record<string, string> = {};
@@ -98,8 +99,11 @@
         requestBody.max_tokens = maxTokensNum;
       }
       
-      if (cronSchedule) requestBody.cronSchedule = cronSchedule;
-      if (scheduleActive) requestBody.scheduleActive = scheduleActive;
+      if (cronSchedule) {
+        requestBody.cronSchedule = cronSchedule;
+        requestBody.timezone = timezone;
+      }
+      if (scheduleActive && cronSchedule) requestBody.scheduleActive = scheduleActive;
 
       const response = await dagApi.createDag({ requestBody });
 
@@ -209,30 +213,68 @@
         </Card.Description>
       </Card.Header>
       <Card.Content class="space-y-4">
-        <div class="space-y-2">
-          <label for="cronSchedule" class="text-sm font-medium">Cron Schedule</label>
-          <Input
-            id="cronSchedule"
-            bind:value={cronSchedule}
-            placeholder="e.g., 0 9 * * * (daily at 9am)"
-          />
-          <p class="text-xs text-muted-foreground">
-            Examples: "0 9 * * *" (daily at 9am), "0 */6 * * *" (every 6 hours)
-          </p>
-        </div>
+         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+           <div class="space-y-2">
+             <label for="cronSchedule" class="text-sm font-medium">Cron Schedule</label>
+             <Input
+               id="cronSchedule"
+               bind:value={cronSchedule}
+               placeholder="e.g., 0 9 * * * (daily at 9am)"
+             />
+             <p class="text-xs text-muted-foreground">
+               Examples: "0 9 * * *" (daily at 9am), "0 */6 * * *" (every 6 hours)
+             </p>
+           </div>
 
-        <div class="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            id="scheduleActive"
-            bind:checked={scheduleActive}
-            class="h-4 w-4 rounded border-gray-300"
-          />
-          <label for="scheduleActive" class="text-sm font-medium">
-            Activate schedule immediately
-          </label>
-        </div>
-      </Card.Content>
+           <div class="space-y-2">
+             <label for="timezone" class="text-sm font-medium">Time Zone</label>
+             <select
+               id="timezone"
+               bind:value={timezone}
+               class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+             >
+               <optgroup label="Common Zones">
+                 <option value="America/New_York">Eastern Time (ET)</option>
+                 <option value="America/Chicago">Central Time (CT)</option>
+                 <option value="America/Denver">Mountain Time (MT)</option>
+                 <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                 <option value="UTC">UTC / GMT</option>
+                 <option value="Europe/London">London (GMT/BST)</option>
+                 <option value="Europe/Paris">Central European Time</option>
+               </optgroup>
+               <optgroup label="Asia/Pacific">
+                 <option value="Asia/Tokyo">Japan Standard Time</option>
+                 <option value="Asia/Shanghai">China Standard Time</option>
+                 <option value="Asia/Singapore">Singapore Time</option>
+                 <option value="Asia/Hong_Kong">Hong Kong Time</option>
+                 <option value="Asia/Dubai">Gulf Standard Time</option>
+                 <option value="Australia/Sydney">Sydney Time</option>
+               </optgroup>
+               <optgroup label="Other">
+                 <option value="America/Toronto">Toronto (EST/EDT)</option>
+                 <option value="America/Mexico_City">Mexico City (CST/CDT)</option>
+                 <option value="Brazil/Sao_Paulo">São Paulo (BRT/BRST)</option>
+                 <option value="Asia/Kolkata">India Standard Time</option>
+               </optgroup>
+             </select>
+             <p class="text-xs text-muted-foreground">
+               Current: {timezone}
+             </p>
+           </div>
+         </div>
+
+         <div class="flex items-center space-x-2">
+           <input
+             type="checkbox"
+             id="scheduleActive"
+             bind:checked={scheduleActive}
+             class="h-4 w-4 rounded border-gray-300"
+           />
+           <label for="scheduleActive" class="text-sm font-medium">
+             Activate schedule immediately
+           </label>
+         </div>
+       </Card.Content>
     </Card.Root>
 
     <Card.Root>

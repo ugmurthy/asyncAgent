@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import parser from 'cron-parser';
 import type { Database } from '../db/client.js';
 import type { Logger } from '../util/logger.js';
 import { dags, dagExecutions, subSteps } from '../db/schema.js';
@@ -20,6 +21,9 @@ interface ScheduledDAG {
   id: string;
   cronSchedule: string;
   scheduleActive: boolean;
+  lastRunAt?: Date | null;
+  createdAt?: Date;
+  timezone?: string;
 }
 
 export class DAGScheduler {
@@ -50,11 +54,17 @@ export class DAGScheduler {
     // Register cron jobs for each scheduled DAG
     for (const dag of scheduledDAGs) {
       if (dag.cronSchedule) {
-        this.registerDAGSchedule({
+        const scheduleInfo: ScheduledDAG = {
           id: dag.id,
           cronSchedule: dag.cronSchedule,
           scheduleActive: dag.scheduleActive ?? false,
-        });
+          lastRunAt: dag.lastRunAt,
+          createdAt: dag.createdAt,
+          timezone: dag.timezone,
+        };
+        
+        await this.checkMissedSchedule(scheduleInfo);
+        this.registerDAGSchedule(scheduleInfo);
       }
     }
 
@@ -99,11 +109,12 @@ export class DAGScheduler {
       scheduledDAG.cronSchedule,
       async () => {
         logger.info(`Cron triggered for DAG: ${scheduledDAG.id}`);
+        await this.updateLastRunAt(scheduledDAG.id);
         await this.executeScheduledDAG(scheduledDAG.id);
       },
       {
         scheduled: true,
-        timezone: 'UTC',
+        timezone: scheduledDAG.timezone || 'UTC',
       }
     );
 
@@ -119,6 +130,47 @@ export class DAGScheduler {
       task.stop();
       this.tasks.delete(dagId);
       logger.info(`Unregistered DAG schedule: ${dagId}`);
+    }
+  }
+
+  async updateLastRunAt(dagId: string): Promise<void> {
+    const { db, logger } = this.config;
+    try {
+      await db.update(dags)
+        .set({ lastRunAt: new Date() })
+        .where(eq(dags.id, dagId));
+    } catch (error) {
+      logger.error({ err: error, dagId }, 'Failed to update DAG lastRunAt');
+    }
+  }
+
+  async checkMissedSchedule(dag: ScheduledDAG): Promise<void> {
+    const { logger } = this.config;
+    try {
+      if (!dag.cronSchedule) return;
+
+      const options = {
+        currentDate: dag.lastRunAt || dag.createdAt || new Date(),
+        tz: dag.timezone || 'UTC',
+      };
+      
+      // Parse the cron expression
+      const interval = parser.parseExpression(dag.cronSchedule, options);
+      const now = new Date();
+      
+      // Get the next scheduled run relative to the last run
+      const nextRun = interval.next().toDate();
+      
+      // If the next scheduled run is in the past, we missed it
+      if (nextRun < now) {
+        logger.info(`Missed schedule for DAG: ${dag.id}. Last run: ${options.currentDate}, Scheduled: ${nextRun}, Now: ${now}`);
+        
+        // Trigger immediately
+        await this.updateLastRunAt(dag.id);
+        await this.executeScheduledDAG(dag.id);
+      }
+    } catch (error) {
+      logger.error({ err: error, dagId: dag.id }, 'Failed to check for missed DAG schedules');
     }
   }
 

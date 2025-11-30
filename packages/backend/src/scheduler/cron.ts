@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import parser from 'cron-parser';
 import type { Database } from '../db/client.js';
 import type { Logger } from '../util/logger.js';
 import { schedules, runs, goals } from '../db/schema.js';
@@ -48,6 +49,7 @@ export class CronScheduler {
 
     // Register cron jobs for each schedule
     for (const schedule of activeSchedules) {
+      await this.checkMissedSchedule(schedule);
       this.registerSchedule(schedule);
     }
 
@@ -90,6 +92,7 @@ export class CronScheduler {
       schedule.cronExpr,
       async () => {
         logger.info(`Cron triggered for goal: ${schedule.goal.objective}`);
+        await this.updateLastRunAt(schedule.id);
         await this.triggerGoal(schedule.goalId);
       },
       {
@@ -110,6 +113,48 @@ export class CronScheduler {
       task.stop();
       this.tasks.delete(scheduleId);
       logger.info(`Unregistered schedule: ${scheduleId}`);
+    }
+  }
+
+  async updateLastRunAt(scheduleId: string): Promise<void> {
+    const { db, logger } = this.config;
+    try {
+      await db.update(schedules)
+        .set({ lastRunAt: new Date() })
+        .where(eq(schedules.id, scheduleId));
+    } catch (error) {
+      logger.error({ err: error, scheduleId }, 'Failed to update schedule lastRunAt');
+    }
+  }
+
+  async checkMissedSchedule(schedule: any): Promise<void> {
+    const { logger } = this.config;
+    try {
+      if (!schedule.cronExpr) return;
+
+      const options = {
+        currentDate: schedule.lastRunAt || schedule.createdAt || new Date(),
+        tz: schedule.timezone || 'UTC',
+      };
+      
+      // Parse the cron expression
+      const interval = parser.parseExpression(schedule.cronExpr, options);
+      const now = new Date();
+      
+      // Get the next scheduled run relative to the last run
+      const nextRun = interval.next().toDate();
+      
+      // If the next scheduled run is in the past, we missed it
+      if (nextRun < now) {
+        logger.info(`Missed schedule for goal: ${schedule.goal?.objective || schedule.id}. Last run: ${options.currentDate}, Scheduled: ${nextRun}, Now: ${now}`);
+        
+        // Trigger immediately
+        // We update lastRunAt to now so we don't trigger again immediately if restarted
+        await this.updateLastRunAt(schedule.id);
+        await this.triggerGoal(schedule.goalId);
+      }
+    } catch (error) {
+      logger.error({ err: error, scheduleId: schedule.id }, 'Failed to check for missed schedules');
     }
   }
 

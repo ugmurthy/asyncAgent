@@ -116,6 +116,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         seed: z.number().optional(),
         cronSchedule: z.string().optional(),
         scheduleActive: z.boolean().optional(),
+        timezone: z.string().optional().default('UTC'),
       });
 
       const body = inputSchema.parse(request.body);
@@ -312,6 +313,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
             dagTitle,
             cronSchedule: body.cronSchedule || null,
             scheduleActive: scheduleActive,
+            timezone: body.timezone,
             params: {
               goalText,
               agentName,
@@ -337,8 +339,9 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
               id: dagId,
               cronSchedule: body.cronSchedule,
               scheduleActive: scheduleActive,
+              timezone: body.timezone,
             });
-            log.info({ dagId, cronSchedule: body.cronSchedule }, 'DAG schedule registered');
+            log.info({ dagId, cronSchedule: body.cronSchedule, timezone: body.timezone }, 'DAG schedule registered');
           }
 
           return reply.code(200).send({
@@ -1434,6 +1437,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         params: z.record(z.any()).optional(),
         cronSchedule: z.string().optional(),
         scheduleActive: z.boolean().optional(),
+        timezone: z.string().optional(),
       });
 
       const { id } = paramsSchema.parse(request.params);

@@ -43,6 +43,20 @@
       "when": 1763378227027,
       "tag": "0005_zippy_preak",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1732722000000,
+      "tag": "0006_add_suspended_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1732722100000,
+      "tag": "0007_add_timezone_to_dags",
+      "breakpoints": true
     }
   ]
 }
