@@ -5,7 +5,7 @@ import * as cheerio from 'cheerio';
 
 const webSearchInputSchema = z.object({
   query: z.string().describe('The search query'),
-  limit: z.number().int().min(1).max(20).default(5).describe('Number of results to return'),
+  limit: z.number().int().min(1).max(20).default(10).describe('Number of results to return'),
 });
 
 type WebSearchInput = z.infer<typeof webSearchInputSchema>;

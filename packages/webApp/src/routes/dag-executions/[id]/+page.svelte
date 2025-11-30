@@ -515,12 +515,19 @@
                         <summary class="cursor-pointer text-blue-600">
                           View result
                         </summary>
-                        <pre
-                          class="mt-2 p-2 bg-gray-50 rounded text-xs overflow-x-auto">{JSON.stringify(
-                            step.result,
-                            null,
-                            2
-                          )}</pre>
+                        <div
+                          class="mt-2 p-2 bg-gray-50 rounded text-xs overflow-x-auto max-h-96 overflow-y-auto"
+                        >
+                          {#if typeof step.result === "string"}
+                            <MarkdownRenderer source={step.result} />
+                          {:else}
+                            <MarkdownRenderer
+                              source={"```json\n" +
+                                JSON.stringify(step.result, null, 2) +
+                                "\n```"}
+                            />
+                          {/if}
+                        </div>
                       </details>
                     {:else if step.error}
                       <p class="text-sm text-red-600">{step.error}</p>

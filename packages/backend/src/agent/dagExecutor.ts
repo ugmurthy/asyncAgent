@@ -3,9 +3,10 @@ import type { LLMProvider } from '@async-agent/shared';
 import { generateId } from '@async-agent/shared';
 import { ToolRegistry } from './tools/index.js';
 import type { Database } from '../db/index.js';
-import { dagExecutions, subSteps, type SubStep } from '../db/schema.js';
+import { dagExecutions, subSteps, agents, type SubStep } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
 import { dagEventBus } from '../events/bus.js';
+import { LlmExecuteTool } from '../agent/tools/llmExecute.js';
 
 export interface SubTask {
   id: string;
@@ -432,15 +433,34 @@ export class DAGExecutor {
 
         const fullPrompt = `${promptText}\n\nContext from previous tasks:\n${contextStr}`;
 
-        const response = await llmProvider.chat({
-          messages: [
-            { role: 'system', content: 'You are a helpful assistant.' },
-            { role: 'user', content: fullPrompt }
-          ],
-          temperature: 0.7,
+        // Get agent details using agentName from task
+        const agentName = task.tool_or_prompt.name;
+        const agent = await db.query.agents.findFirst({
+          where: eq(agents.name, agentName),
         });
 
-        return response.content;
+        if (!agent) {
+          throw new Error(`No agent found with name: ${agentName}`);
+        }
+
+        const llmExecuteTool = new LlmExecuteTool();
+        //if (!llmExecuteTool) {
+        //  logger.warn('llmExecute tool not found in registry');
+        //}
+
+        const result = await llmExecuteTool.execute({
+          provider: agent.provider as 'openai' | 'openrouter' | 'openrouter-fetch' | 'ollama',
+          model: agent.model,
+          task: agent.promptTemplate,
+          prompt: fullPrompt,
+        }, {
+          db,
+          logger,
+          runId: `dag-${Date.now()}`,
+          abortSignal: new AbortController().signal,
+        });
+
+        return result.content;
       }
 
       throw new Error(`Unknown action type: ${task.action_type}`);
