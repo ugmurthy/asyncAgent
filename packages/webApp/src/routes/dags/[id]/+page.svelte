@@ -201,7 +201,7 @@
             <div class="text-sm font-medium text-muted-foreground mb-2">
               {dag?.dagTitle}
             </div>
-            <div class="p-3 bg-muted rounded-md">
+            <div class="p-3 bg-muted rounded-md whitespace-pre-wrap">
               {dag?.result?.original_request}
             </div>
             <div class="text-sm font-medium text-muted-foreground mb-2">

@@ -192,6 +192,8 @@ export class DAGScheduler {
     }
 
     const job = dagRecord.result as DecomposerJob;
+    // Use original goalText from DAG params (preserves formatting) instead of LLM's original_request
+    const originalGoalText = (dagRecord.params as any)?.goalText || job.original_request;
     
     const executionId = generateId('dag-exec');
 
@@ -207,7 +209,7 @@ export class DAGScheduler {
       await db.insert(dagExecutions).values({
         id: executionId,
         dagId: dagId || null,
-        originalRequest: job.original_request,
+        originalRequest: originalGoalText,
         primaryIntent: job.intent.primary,
         status: 'pending',
         totalTasks: job.sub_tasks.length,
@@ -235,7 +237,7 @@ export class DAGScheduler {
     }
 
     // Execute in background
-    this.dagExecutor.execute(job, executionId, dagId).catch(async (error) => {
+    this.dagExecutor.execute(job, executionId, dagId, originalGoalText).catch(async (error) => {
       logger.error({ err: error, executionId }, 'Scheduled DAG execution failed');
 
       try {

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+action=$TOOLBOX_ACTION
+dir=$AMP_TOOLBOX
+
+if [ "$action" = "describe" ]; then
+  echo [ \'name: saveDb\', 
+  echo   \'description: Use this tool to backup sqlite db \',
+  echo   \'dir : $pwd\' ]
+
+elif [ "$action" = "action" ]; then
+  $dir/backup-db.sh
+fi
+
+

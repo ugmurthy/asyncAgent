@@ -97,7 +97,7 @@ type MemoryType = 'note' | 'fact' | 'artifact';
 // Goal
 interface Goal {
   id: string;                    // Format: goal_xxxxx
-  objective: string;             // 10-1000 characters
+  objective: string;             // 10-10000 characters
   params: GoalParams;
   webhookUrl?: string | null;
   status: GoalStatus;
@@ -166,7 +166,7 @@ interface RunWithGoal extends Run {
 ```typescript
 // Create Goal Request
 interface CreateGoalRequest {
-  objective: string;             // 10-1000 characters, required
+  objective: string;             // 10-10000 characters, required
   params?: GoalParams;           // Optional
   webhookUrl?: string;           // Valid URL, optional
   schedule?: {                   // Optional
@@ -177,7 +177,7 @@ interface CreateGoalRequest {
 
 // Update Goal Request
 interface UpdateGoalRequest {
-  objective?: string;            // 10-1000 characters
+  objective?: string;            // 10-10000 characters
   params?: GoalParams;
   webhookUrl?: string | null;
   status?: GoalStatus;
@@ -278,7 +278,7 @@ POST /api/v1/goals
 ```
 
 **Validation Rules:**
-- `objective`: 10-1000 characters (required)
+- `objective`: 10-10000 characters (required)
 - `webhookUrl`: Must be a valid URL (optional)
 - `params.stepBudget`: Positive integer (optional)
 - `schedule.cronExpr`: Valid cron expression (optional)
@@ -1055,9 +1055,9 @@ export function GoalForm({ onSuccess }: { onSuccess: () => void }) {
         type="text"
         value={objective}
         onChange={(e) => setObjective(e.target.value)}
-        placeholder="Goal objective (10-1000 characters)"
+        placeholder="Goal objective (10-10000 characters)"
         minLength={10}
-        maxLength={1000}
+        maxLength={10000}
         required
       />
       

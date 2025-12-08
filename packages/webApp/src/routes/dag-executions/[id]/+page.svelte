@@ -368,7 +368,7 @@
         <div>
           <p class="pt-4">Requested Task</p>
           <hr />
-          <p class="text-sm">
+          <p class="text-sm whitespace-pre-wrap">
             {execution.originalRequest}
           </p>
         </div>

@@ -252,8 +252,10 @@ export class DAGExecutor {
     return resolvedValue;
   }
 
-  async execute(job: DecomposerJob, executionId?: string, dagId?: string): Promise<string> {
+  async execute(job: DecomposerJob, executionId?: string, dagId?: string, originalRequest?: string): Promise<string> {
     const { logger, llmProvider, toolRegistry, db } = this.config;
+    // Use provided originalRequest (from DAG params) or fall back to job.original_request
+    const effectiveOriginalRequest = originalRequest || job.original_request;
 
     if (job.clarification_needed) {
       throw new Error(`Clarification needed: ${job.clarification_query}`);
@@ -319,14 +321,14 @@ export class DAGExecutor {
           executionId: execId,
           timestamp: Date.now(),
           totalTasks: job.sub_tasks.length,
-          originalRequest: job.original_request,
+          originalRequest: effectiveOriginalRequest,
         });
       } else {
         // Create new execution (fallback for backward compatibility)
         await db.insert(dagExecutions).values({
           id: execId,
           dagId: dagId || null,
-          originalRequest: job.original_request,
+          originalRequest: effectiveOriginalRequest,
           primaryIntent: job.intent.primary,
           status: 'running',
           totalTasks: job.sub_tasks.length,
@@ -353,7 +355,7 @@ export class DAGExecutor {
           executionId: execId,
           timestamp: Date.now(),
           totalTasks: job.sub_tasks.length,
-          originalRequest: job.original_request,
+          originalRequest: effectiveOriginalRequest,
         });
 
         logger.info({ executionId: execId }, 'DAG execution record created');

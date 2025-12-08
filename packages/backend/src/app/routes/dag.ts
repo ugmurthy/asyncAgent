@@ -444,12 +444,15 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         totalTasks: job.sub_tasks.length 
       },'Starting DAG execution');
 
+      // Use original goalText from DAG params (preserves formatting) instead of LLM's original_request
+      const originalGoalText = (dagRecord.params as any)?.goalText || job.original_request;
+
       // Create initial execution record before starting async execution
       try {
         await db.insert(dagExecutions).values({
           id: executionId,
           dagId: dagId || null,
-          originalRequest: job.original_request,
+          originalRequest: originalGoalText,
           primaryIntent: job.intent.primary,
           status: 'pending',
           totalTasks: job.sub_tasks.length,
@@ -488,7 +491,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       });
 
       // Execute asynchronously in background - records already created with 'pending' status
-      dagExecutor.execute(job, executionId, dagId).catch(async (error) => {
+      dagExecutor.execute(job, executionId, dagId, originalGoalText).catch(async (error) => {
         log.error({ err: error, executionId }, 'DAG execution failed in background');
         
         // Ensure execution is marked as suspended if not already handled
@@ -524,7 +527,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         status: 'started',
         executionId,
         dagId,
-        originalRequest: job.original_request,
+        originalRequest: originalGoalText,
         totalTasks: job.sub_tasks.length,
         message: 'DAG execution started. Connect to SSE stream for live updates.',
       });
@@ -604,6 +607,8 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       }
 
       const job = DecomposerJobSchema.parse(dagRecord.result) as DecomposerJob;
+      // Use original goalText from DAG params (preserves formatting) instead of LLM's original_request
+      const originalGoalText = (dagRecord.params as any)?.goalText || job.original_request;
 
       // Update status to pending and increment retry count
       await db.update(dagExecutions)
@@ -630,7 +635,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
 
       // Resume execution using same execution ID
       // Execute async but return immediately after validation passes
-      const executePromise = dagExecutor.execute(job, executionId, execution.dagId);
+      const executePromise = dagExecutor.execute(job, executionId, execution.dagId, originalGoalText);
       
       // Wait briefly to catch immediate validation errors (like missing sub-steps)
       await Promise.race([

@@ -1,0 +1,82 @@
+#!/usr/bin/env node
+import fs from "node:fs"
+import { execSync } from "node:child_process"
+/**
+ * This program implements the Amp Toolbox protocol to provide
+ * custom tools to an LLM without writing an MCP server.
+ *
+ * Amp invokes this program once at startup with TOOLBOX_ACTION set
+ * to "describe".  The program then needs to write its tool schema
+ * to stdout.
+ *
+ * When the model wants to use the tool, TOOLBOX_ACTION is set to
+ * "execute" and tool parameters are passed to stdin as a JSON object.
+ *
+ * Any output on stdout/stderr goes directly to the model and need not
+ * be structured.
+ */
+const action = process.env.TOOLBOX_ACTION
+const folder = process.env.AMP_TOOLBOX;
+
+console.log(`action: ${action}, folder ${folder}`)
+
+if (action === 'describe') showDescription()
+else if (action === 'execute') execute()
+
+/**
+ * Use args for a simplified tool description:
+ *  - [type, description]
+ *  - where type is "string", "number", "object", "array", "boolean"
+ *
+ * Use inputSchema instead for full JSON schema support.
+ */
+function showDescription() {
+ // The description MUST mention when to use this tool instead of Bash,
+ // otherwise the model will prefer unstructured command line tools.
+ //
+ // Tools like this one should always have highest priority, because
+ // they are carefully crafted for a specific purpose.
+ console.log("DESCRIBE");
+  process.stdout.write(
+  JSON.stringify({
+   name: "saveDb",
+   description: 'You must use this tool to save database or db for this repo..',
+   args: { action: ['save', 'list'] },
+  }),
+ )
+}
+
+function execute() {
+ // parse parameters as JSON from stdin (matches inputSchema/args from showDescription)
+console.log("ACTION")
+let content = fs.readFileSync(0,'utf-8');
+
+console.log(`Content : ${content}`);
+let args = JSON.parse(content);
+let action = args['action']
+console.log(`Arguments : ${Object.keys(args)} ---  ${action}`);
+ action = action && action.length > 0 ? action : 'help'
+
+ // output goes directly to the model
+ switch (action) {
+        case "save":
+              try {
+                console.log(`Running backup-db.sh from ${folder}`)
+                const scriptPath = `${folder}/backup-db.sh`
+                const output = execSync(`bash ${scriptPath}`, { encoding: 'utf-8' })
+                console.log(output)
+              } catch (error) {
+                console.error(`Error running backup-db.sh: ${error.message}`)
+                process.exit(1)
+              }
+              break;
+        case "list":
+              console.log(`Listing  ${folder}/saveDb`)
+              break;
+            
+ case "help": break;
+
+    default: process.stderr.write(`Unknown action: ${action}`); process.exit(1);
+ 
+ }
+}
