@@ -10,8 +10,8 @@ export function generateBlueprintMermaid(subTasks: SubTask[]): string {
   let graph = 'graph TD;\n';
   
   // Styling definitions
-  graph += '  classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;\n';
-  graph += '  classDef start fill:#e1f5fe,stroke:#01579b,stroke-width:2px;\n';
+  graph += '  classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,rx:10,ry:10;\n';
+  graph += '  classDef start fill:#e1f5fe,stroke:#01579b,stroke-width:2px,rx:10,ry:10;\n';
   
   // Nodes
   subTasks.forEach(task => {
@@ -37,11 +37,11 @@ export function generateExecutionMermaid(subSteps: any[]): string {
   let graph = 'graph TD;\n';
   
   // Styling definitions
-  graph += '  classDef pending fill:#f0f0f0,stroke:#ccc,stroke-width:1px,color:#999;\n';
-  graph += '  classDef waiting fill:#fff3e0,stroke:#ff9800,stroke-width:1px,stroke-dasharray: 5 5;\n';
-  graph += '  classDef running fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,animation:pulse 2s infinite;\n';
-  graph += '  classDef completed fill:#e8f5e9,stroke:#4caf50,stroke-width:2px;\n';
-  graph += '  classDef failed fill:#ffebee,stroke:#f44336,stroke-width:2px;\n';
+  graph += '  classDef pending fill:#f0f0f0,stroke:#ccc,stroke-width:1px,color:#999,rx:10,ry:10;\n';
+  graph += '  classDef waiting fill:#fff3e0,stroke:#ff9800,stroke-width:1px,stroke-dasharray: 5 5,rx:10,ry:10;\n';
+  graph += '  classDef running fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,animation:pulse 2s infinite,rx:10,ry:10;\n';
+  graph += '  classDef completed fill:#e8f5e9,stroke:#4caf50,stroke-width:2px,rx:10,ry:10;\n';
+  graph += '  classDef failed fill:#ffebee,stroke:#f44336,stroke-width:2px,rx:10,ry:10;\n';
   
   // Nodes
   subSteps.forEach((step: any) => {

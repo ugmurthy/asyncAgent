@@ -3,6 +3,8 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { ClarificationResponse } from '../models/ClarificationResponse.js';
+import type { CreateAndExecuteDAGResponse } from '../models/CreateAndExecuteDAGResponse.js';
+import type { CreateDAGClarificationResponse } from '../models/CreateDAGClarificationResponse.js';
 import type { CreateDAGRequest } from '../models/CreateDAGRequest.js';
 import type { CreateDAGResponse } from '../models/CreateDAGResponse.js';
 import type { DAG } from '../models/DAG.js';
@@ -14,6 +16,7 @@ import type { DeleteDAGExecutionResponse } from '../models/DeleteDAGExecutionRes
 import type { ExecuteDAGResponse } from '../models/ExecuteDAGResponse.js';
 import type { MessageResponse } from '../models/MessageResponse.js';
 import type { ResumeDAGResponse } from '../models/ResumeDAGResponse.js';
+import type { ScheduledDAG } from '../models/ScheduledDAG.js';
 import type { UpdateDAGRequest } from '../models/UpdateDAGRequest.js';
 import type { CancelablePromise } from '../core/CancelablePromise.js';
 import type { BaseHttpRequest } from '../core/BaseHttpRequest.js';
@@ -62,6 +65,33 @@ export class DagService {
         return this.httpRequest.request({
             method: 'POST',
             url: '/api/v1/execute-dag',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Bad Request - validation error`,
+                404: `Resource not found`,
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
+     * Create and immediately execute a DAG
+     * Create a DAG from goal text and immediately execute it if creation succeeds.
+     * If clarification is needed, returns clarification response without executing.
+     * Combines the create-dag and execute-dag operations into a single call.
+     *
+     * @returns CreateDAGClarificationResponse Clarification required - DAG not executed
+     * @returns CreateAndExecuteDAGResponse DAG created and execution started
+     * @throws ApiError
+     */
+    public createAndExecuteDag({
+        requestBody,
+    }: {
+        requestBody: CreateDAGRequest,
+    }): CancelablePromise<CreateDAGClarificationResponse | CreateAndExecuteDAGResponse> {
+        return this.httpRequest.request({
+            method: 'POST',
+            url: '/api/v1/create-and-execute-dag',
             body: requestBody,
             mediaType: 'application/json',
             errors: {
@@ -273,6 +303,21 @@ export class DagService {
             },
             errors: {
                 400: `Bad Request - validation error`,
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
+     * List scheduled DAGs
+     * Retrieve all DAGs that have a cron schedule configured
+     * @returns ScheduledDAG List of scheduled DAGs
+     * @throws ApiError
+     */
+    public listScheduledDags(): CancelablePromise<Array<ScheduledDAG>> {
+        return this.httpRequest.request({
+            method: 'GET',
+            url: '/api/v1/dags/scheduled',
+            errors: {
                 500: `Internal server error`,
             },
         });

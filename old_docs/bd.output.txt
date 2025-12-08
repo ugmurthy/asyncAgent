@@ -1,0 +1,137 @@
+bd init --stealth
+Creating new global gitignore file: /Users/ugmurthy/.config/git/ignore
+Configured global gitignore for stealth mode
+Configured Claude settings with bd onboard instruction
+
+✓ Stealth mode configured successfully!
+
+  Global gitignore: .beads/ and .claude/settings.local.json ignored
+  Claude settings: configured with bd onboard instruction
+
+Your beads setup is now invisible - other repo collaborators won't see any beads-related files.
+
+  Sync branch: main
+  Repository ID: f5a03c3d
+  Clone ID: 1f1ad0abd0faabeb
+
+✓ bd initialized successfully!
+
+  Database: .beads/beads.db
+  Issue prefix: asyncAgent
+  Issues will be named: asyncAgent-1, asyncAgent-2, ...
+
+Run bd quickstart to get started.
+
+⚠ Setup incomplete. Some issues were detected:
+  • Git Hooks: No recommended git hooks installed
+  • Claude Integration: Not configured
+  • Git Merge Driver: Git merge driver not configured
+  • Metadata Version Tracking: LastBdVersion field is empty (first run)
+  • Sync Branch Config: sync-branch not configured
+
+Run bd doctor --fix to see details and fix these issues.
+
+╭─ugmurthy at UGMs-MacPro-M4 in ~/riding-amp/asyncAgent on main✔
+╰─± bd doctor --fix
+
+Fixable issues:
+  1. Git Hooks: No recommended git hooks installed
+  2. Claude Integration: Not configured
+  3. Git Merge Driver: Git merge driver not configured
+  4. Metadata Version Tracking: LastBdVersion field is empty (first run)
+  5. Sync Branch Config: sync-branch not configured
+
+This will attempt to fix 5 issue(s). Continue? (Y/n): Y
+
+Applying fixes...
+
+Fixing Git Hooks...
+✓ Git hooks installed successfully
+
+Installed hooks:
+  - pre-commit
+  - post-merge
+  - pre-push
+  - post-checkout
+  ✓ Fixed
+
+Fixing Claude Integration...
+  ⚠ No automatic fix available for Claude Integration
+  Manual fix: Set up Claude integration:
+  1. Run 'bd setup claude' to add SessionStart/PreCompact hooks
+  2. (Optional) Install beads plugin for slash commands
+
+Benefits:
+  • Hooks: Auto-inject workflow context (~50-2k tokens)
+  • Plugin: Convenient slash commands + MCP tools
+  • CLI mode: Works without plugin (hooks + manual 'bd prime')
+
+See: bd setup claude --help
+
+Fixing Git Merge Driver...
+  ✓ Fixed
+
+Fixing Metadata Version Tracking...
+  ⚠ No automatic fix available for Metadata Version Tracking
+  Manual fix: Run any bd command to initialize version tracking
+
+Fixing Sync Branch Config...
+  ⚠ Add 'sync-branch: beads-sync' to .beads/config.yaml
+
+Fix summary: 2 fixed, 0 errors
+
+Diagnostics
+ ├ Installation: .beads/ directory found
+ ├ Git Hooks: All recommended hooks installed
+ │   Installed: pre-commit, post-merge, pre-push
+ ├ Fresh Clone: Database exists
+ ├ Database: version 0.29.0
+ │   Storage: SQLite
+ ├ Schema Compatibility: All required tables and columns present
+ ├ Database Integrity: No corruption detected
+ ├ Issue IDs: No issues yet (will use hash-based IDs)
+ ├ CLI Version: 0.29.0 (latest)
+ ├ Database Files: Single database file
+ ├ JSONL Files: Using issues.jsonl
+ ├ JSONL Config: Using issues.jsonl
+ ├ Database Config: Configuration matches existing files
+ ├ Config Values: All configuration values are valid
+ ├ Daemon Health: Daemon running (PID 37702, version 0.29.0)
+ ├ DB-JSONL Sync: Database and JSONL are in sync
+ ├ Permissions: All permissions OK
+ ├ Dependency Cycles: No circular dependencies detected
+ ├ Claude Integration: Not configured ⚠
+ │   Claude can use bd more effectively with hooks and optional plugin
+ ├ bd in PATH: 'bd' command available
+ ├ Documentation bd prime: No bd prime references in documentation
+ ├ Agent Documentation: Documentation found: AGENTS.md
+ ├ Documentation: No legacy beads slash commands detected
+ ├ Gitignore: Up to date
+ ├ Git Merge Driver: Correctly configured
+ │   bd merge %A %O %A %B
+ ├ Metadata Version Tracking: LastBdVersion field is empty (first run) ⚠
+ │   Version tracking will be initialized on next command
+ ├ Sync Branch Config: sync-branch not configured ⚠
+ │   Multi-clone setups should configure sync-branch in config.yaml
+ ├ Sync Branch Health: N/A (no sync branch configured)
+ ├ Deletions Manifest: Not yet created (no deletions recorded)
+ └ Untracked Files: All .beads/*.jsonl files are tracked
+
+⚠ Warning: Not configured
+  Fix: Set up Claude integration:
+  1. Run 'bd setup claude' to add SessionStart/PreCompact hooks
+  2. (Optional) Install beads plugin for slash commands
+
+Benefits:
+  • Hooks: Auto-inject workflow context (~50-2k tokens)
+  • Plugin: Convenient slash commands + MCP tools
+  • CLI mode: Works without plugin (hooks + manual 'bd prime')
+
+See: bd setup claude --help
+
+⚠ Warning: LastBdVersion field is empty (first run)
+  Fix: Run any bd command to initialize version tracking
+
+⚠ Warning: sync-branch not configured
+  Fix: Add 'sync-branch: beads-sync' to .beads/config.yaml
+

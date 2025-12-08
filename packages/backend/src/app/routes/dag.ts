@@ -302,6 +302,8 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
           } catch (titleError) {
             log.error({ err: titleError }, 'Error calling TitleMaster');
           }
+          /// to ensure goalText is retained as is in dag
+          dag.original_request=goalText;
           await db.insert(dags).values({
             id: dagId,
             status: 'success',
@@ -385,6 +387,466 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       const errorMessage = error instanceof Error ? error.message : String(error);
       
       return reply.code(500).send({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * POST /create-and-execute-dag - Create a DAG and immediately execute it if successful
+   * 
+   * @param request.body.goal-text - The goal description to decompose into tasks
+   * @param request.body.agentName - Name of the agent to use for DAG creation
+   * @param request.body.provider - (Optional) LLM provider override (openai|openrouter|ollama)
+   * @param request.body.model - (Optional) LLM model override
+   * @param request.body.max_tokens - (Optional) Maximum tokens for LLM response
+   * @param request.body.temperature - (Optional) LLM temperature (0-2)
+   * @param request.body.seed - (Optional) Random seed for reproducibility
+   * @param request.body.cronSchedule - (Optional) Cron schedule for recurring execution
+   * @param request.body.scheduleActive - (Optional) Whether the schedule is active
+   * @param request.body.timezone - (Optional) Timezone for the schedule
+   * 
+   * @returns {202} Success - DAG created and execution started
+   * @returns {200} Clarification Required - LLM needs more information
+   * @returns {400} Bad Request - Invalid input or LLM configuration
+   * @returns {404} Not Found - Agent not found or inactive
+   * @returns {500} Server Error - DAG creation or execution failed
+   */
+  fastify.post('/create-and-execute-dag', async (request, reply) => {
+    try {
+      const inputSchema = z.object({
+        'goal-text': z.string().min(1),
+        agentName: z.string().min(1),
+        provider: z.string().optional(),
+        model: z.string().optional(),
+        max_tokens: z.number().optional(),
+        temperature: z.number().optional(),
+        seed: z.number().optional(),
+        cronSchedule: z.string().optional(),
+        scheduleActive: z.boolean().optional(),
+        timezone: z.string().optional().default('UTC'),
+      });
+
+      const body = inputSchema.parse(request.body);
+      const goalText = body['goal-text'];
+      const agentName = body.agentName;
+      
+      const scheduleActive = body.scheduleActive ?? !!body.cronSchedule;
+
+      if (body.cronSchedule) {
+        const validation = validateCronExpression(body.cronSchedule);
+        if (!validation.valid) {
+          return reply.code(400).send({
+            error: 'Invalid cron expression',
+            details: validation.error,
+          });
+        }
+        log.info({ 
+          cronSchedule: body.cronSchedule, 
+          nextRuns: validation.nextRuns 
+        }, 'Valid cron schedule provided');
+      }
+
+      let activeLLMProvider: LLMProvider;
+      try {
+        if (body.provider && body.model) {
+          log.info({ 
+            requestedProvider: body.provider, 
+            requestedModel: body.model 
+          }, 'Creating custom LLM provider for this request');
+          
+          activeLLMProvider = createLLMProvider({
+            provider: body.provider as 'openai' | 'openrouter' | 'ollama' | 'openrouter-fetch',
+            model: body.model,
+          });
+
+          const validationResult = await activeLLMProvider.validateToolCallSupport(body.model);
+          if (!validationResult.supported) {
+            throw new Error(
+              `Model ${body.model} does not support tool calling. ${validationResult.message || ''}`
+            );
+          }
+        } else {
+          activeLLMProvider = llmProvider;
+        }
+      } catch (providerError) {
+        const errorMessage = providerError instanceof Error ? providerError.message : String(providerError);
+        log.error({ err: errorMessage }, 'Failed to create LLM provider');
+        return reply.code(400).send({
+          status: 'failed',
+          error: 'Invalid LLM provider configuration',
+          details: errorMessage,
+        });
+      }
+
+      const agent = await db.query.agents.findFirst({
+        where: and(eq(agents.name, agentName), eq(agents.active, true)),
+      });
+
+      if (!agent) {
+        return reply.code(404).send({
+          status: 'failed',
+          error: `Agent '${agentName}' not found OR not active`,
+        });
+      }
+      
+      const toolDefinitions = toolRegistry.getAllDefinitions();
+      const systemPrompt = agent.promptTemplate
+        .replace(/\{\{tools\}\}/g,JSON.stringify(toolDefinitions))
+        .replace(/\{\{currentDate\}\}/g, new Date().toLocaleString());
+
+      let currentGoalText = goalText;
+      let showGoalText = goalText.length>50?`${goalText.slice(0,50)}...`:goalText;
+      let attempt = 0;
+      const maxAttempts = 3;
+
+      while (attempt < maxAttempts) {
+        attempt++;
+        log.info({ attempt, agentName, goalText: showGoalText }, 'Creating DAG with LLM inference (create-and-execute)');
+        log.info({ model: activeLLMProvider.model, provider: activeLLMProvider.provider }, 'LLM Provider Configuration');
+        
+        const response = await activeLLMProvider.chat ({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: currentGoalText },
+          ],
+          temperature: body.temperature ?? 0.7,
+          maxTokens: body.max_tokens ?? 10000,
+          ...(body.seed !== undefined && { seed: body.seed }),
+        });
+
+        const MAX_RESPONSE_SIZE = 100_000;
+        if (response.content.length > MAX_RESPONSE_SIZE) {
+          log.error({ responseSize: response.content.length }, 'LLM response exceeds size limit');
+          return reply.code(500).send({
+            status: 'failed',
+            error: `Response too large: ${response.content.length} bytes`,
+            maxSize: MAX_RESPONSE_SIZE,
+          });
+        }
+
+        let result;
+        try {
+          result = extractJsonCodeBlock(response.content);
+        } catch (parseError) {
+          log.error({ 
+            err: parseError, 
+            attempt,
+            responsePreview: response.content.slice(0, 500) 
+          }, 'Failed to parse LLM response as JSON');
+          
+          if (attempt >= maxAttempts) {
+            return reply.code(500).send({
+              status: 'failed',
+              error: 'LLM response is not valid JSON after multiple attempts',
+              attempts: attempt,
+              responsePreview: response.content.slice(0, 500),
+            });
+          }
+          continue;
+        }
+        const usage = response?.usage ?? null;
+        const generation_stats = response?.generation_stats ?? null;
+        const validatedResult = DecomposerJobSchema.safeParse(result);
+        
+        if (!validatedResult.success) {
+          log.error({ 
+            errors: validatedResult.error.issues,
+            attempt 
+          }, 'DAG validation failed');
+          
+          if (attempt >= maxAttempts) {
+            return reply.code(400).send({
+              status: 'failed',
+              error: 'Invalid DAG structure after multiple attempts',
+              validation_errors: validatedResult.error.issues,
+              attempts: attempt,
+              result,
+            });
+          }
+          continue;
+        }
+
+        const dag = validatedResult.data;
+
+        if (dag.clarification_needed) {
+          return reply.code(200).send({
+            status: 'clarification_required',
+            clarification_query: dag.clarification_query,
+            result: dag,
+            usage,
+            generation_stats
+          });
+        }
+
+        if (dag.validation.coverage === 'high') {
+          const dagId = generateId();
+          
+          let dagTitle: string | null = null;
+          try {
+            const titleMasterAgent = await db.query.agents.findFirst({
+              where: and(eq(agents.name, 'TitleMaster'), eq(agents.active, true)),
+            });
+
+            if (titleMasterAgent) {
+              const llmExecuteTool = new LlmExecuteTool();
+              const llmResult = await llmExecuteTool.execute({
+                provider: titleMasterAgent.provider as any,
+                model: titleMasterAgent.model,
+                task: titleMasterAgent.promptTemplate,
+                prompt: truncate(goalText),
+              }, {
+                logger: log,
+                toolRegistry,
+                db
+              });
+              
+              dagTitle = llmResult.content;
+              log.info({ dagTitle }, 'Generated DAG title from TitleMaster');
+            } else {
+              log.warn('TitleMaster agent not found or inactive');
+            }
+          } catch (titleError) {
+            log.error({ err: titleError }, 'Error calling TitleMaster');
+          }
+
+          await db.insert(dags).values({
+            id: dagId,
+            status: 'success',
+            result: dag,
+            usage,
+            generationStats: generation_stats,
+            attempts: attempt,
+            agentName,
+            dagTitle,
+            cronSchedule: body.cronSchedule || null,
+            scheduleActive: scheduleActive,
+            timezone: body.timezone,
+            params: {
+              goalText,
+              agentName,
+              provider: body.provider,
+              model: body.model,
+              temperature: body.temperature ?? 0.7,
+              max_tokens: body.max_tokens ?? 10000,
+              seed: body.seed,
+            },
+          });
+
+          log.info({ 
+            dagId, 
+            agentName, 
+            goalText: showGoalText,
+            cronSchedule: body.cronSchedule,
+            scheduleActive: scheduleActive 
+          }, 'DAG saved to database');
+
+          if (dagScheduler && body.cronSchedule && scheduleActive) {
+            dagScheduler.registerDAGSchedule({
+              id: dagId,
+              cronSchedule: body.cronSchedule,
+              scheduleActive: scheduleActive,
+              timezone: body.timezone,
+            });
+            log.info({ dagId, cronSchedule: body.cronSchedule, timezone: body.timezone }, 'DAG schedule registered');
+          }
+
+          // Immediately execute the DAG
+          const executionId = generateId('dag-exec');
+          const job = dag as DecomposerJob;
+          
+          log.info({ 
+            executionId,
+            dagId,
+            primaryIntent: job.intent.primary,
+            totalTasks: job.sub_tasks.length 
+          }, 'Starting DAG execution (create-and-execute)');
+
+          try {
+            await db.insert(dagExecutions).values({
+              id: executionId,
+              dagId: dagId,
+              originalRequest: goalText,
+              primaryIntent: job.intent.primary,
+              status: 'pending',
+              totalTasks: job.sub_tasks.length,
+            });
+
+            await db.insert(subSteps).values(
+              job.sub_tasks.map(task => ({
+                id: generateId('sub-step'),
+                executionId: executionId,
+                taskId: task.id,
+                description: task.description,
+                thought: task.thought,
+                actionType: task.action_type,
+                toolOrPromptName: task.tool_or_prompt.name,
+                toolOrPromptParams: task.tool_or_prompt.params || {},
+                dependencies: task.dependencies,
+                status: 'pending' as const,
+              }))
+            );
+
+            log.info({ executionId }, 'Initial execution records created');
+          } catch (dbError) {
+            log.error({ err: dbError, executionId }, 'Failed to create initial execution records');
+            return reply.code(500).send({
+              status: 'failed',
+              dagId,
+              error: 'DAG created but failed to initialize execution records',
+              details: dbError instanceof Error ? dbError.message : String(dbError),
+            });
+          }
+
+          const dagExecutor = new DAGExecutor({
+            logger: log,
+            llmProvider,
+            toolRegistry,
+            db,
+          });
+
+          dagExecutor.execute(job, executionId, dagId, goalText).catch(async (error) => {
+            log.error({ err: error, executionId }, 'DAG execution failed in background');
+            
+            try {
+              const execution = await db.query.dagExecutions.findFirst({
+                where: eq(dagExecutions.id, executionId),
+              });
+              
+              if (execution && execution.status !== 'suspended' && execution.status !== 'failed') {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                await db.update(dagExecutions)
+                  .set({
+                    status: 'suspended',
+                    suspendedReason: errorMessage,
+                    suspendedAt: new Date(),
+                  })
+                  .where(eq(dagExecutions.id, executionId));
+                
+                dagEventBus.emit('dag:event', {
+                  type: 'execution.suspended',
+                  executionId,
+                  timestamp: Date.now(),
+                  reason: errorMessage,
+                });
+              }
+            } catch (updateError) {
+              log.error({ err: updateError, executionId }, 'Failed to update execution status after error');
+            }
+          });
+
+          return reply.code(202).send({
+            status: 'executing',
+            dagId,
+            executionId,
+            originalRequest: goalText,
+            totalTasks: job.sub_tasks.length,
+            usage,
+            generation_stats,
+            message: 'DAG created and execution started. Connect to SSE stream for live updates.',
+          });
+        }
+
+        if (dag.validation.gaps && dag.validation.gaps.length > 0) {
+          const gapsText = dag.validation.gaps.map((gap, idx) => `${idx + 1}. ${gap}`).join('\n');
+          currentGoalText = `${goalText}\n\nEnsure following gaps are covered:\n${gapsText}`;
+          
+          log.info({ gaps: dag.validation.gaps, attempt }, 'Retrying with gaps addressed');
+          continue;
+        }
+
+        // Fallback: DAG created but coverage is not high - still save and execute
+        const dagId = generateId();
+        await db.insert(dags).values({
+          id: dagId,
+          status: 'success',
+          result: dag,
+          usage,
+          generationStats: generation_stats,
+          attempts: attempt,
+          agentName,
+          params: {
+            goalText,
+            agentName,
+            provider: body.provider,
+            model: body.model,
+            temperature: body.temperature ?? 0.7,
+            max_tokens: body.max_tokens ?? 10000,
+            seed: body.seed,
+          },
+        });
+
+        const executionId = generateId('dag-exec');
+        const job = dag as DecomposerJob;
+
+        await db.insert(dagExecutions).values({
+          id: executionId,
+          dagId: dagId,
+          originalRequest: goalText,
+          primaryIntent: job.intent.primary,
+          status: 'pending',
+          totalTasks: job.sub_tasks.length,
+        });
+
+        await db.insert(subSteps).values(
+          job.sub_tasks.map(task => ({
+            id: generateId('sub-step'),
+            executionId: executionId,
+            taskId: task.id,
+            description: task.description,
+            thought: task.thought,
+            actionType: task.action_type,
+            toolOrPromptName: task.tool_or_prompt.name,
+            toolOrPromptParams: task.tool_or_prompt.params || {},
+            dependencies: task.dependencies,
+            status: 'pending' as const,
+          }))
+        );
+
+        const dagExecutor = new DAGExecutor({
+          logger: log,
+          llmProvider,
+          toolRegistry,
+          db,
+        });
+
+        dagExecutor.execute(job, executionId, dagId, goalText).catch(async (error) => {
+          log.error({ err: error, executionId }, 'DAG execution failed in background');
+        });
+
+        return reply.code(202).send({
+          status: 'executing',
+          dagId,
+          executionId,
+          originalRequest: goalText,
+          totalTasks: job.sub_tasks.length,
+          usage,
+          generation_stats,
+          message: 'DAG created and execution started. Connect to SSE stream for live updates.',
+        });
+      }
+
+      return reply.code(500).send({
+        status: 'failed',
+        error: 'Failed to create DAG after maximum attempts',
+        max_attempts: maxAttempts,
+      });
+
+    } catch (error) {
+      log.error({ err: error }, 'Create-and-execute DAG failed');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          status: 'failed',
+          error: 'Invalid input parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        status: 'failed',
         error: errorMessage,
       });
     }

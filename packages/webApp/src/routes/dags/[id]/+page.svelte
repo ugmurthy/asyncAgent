@@ -14,7 +14,7 @@
   import { addNotification } from "$lib/stores/notifications";
   import type { PageData } from "./$types";
   import type { ExecuteDAGResponse } from "@async-agent/api-js-client";
-
+  import MarkdownRenderer from "$lib/components/common/MarkdownRenderer.svelte";
   export let data: PageData;
 
   $: dag = data.dag;
@@ -145,11 +145,11 @@
   <Tabs.Root value="overview" class="w-full">
     <Tabs.List>
       <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
+      <Tabs.Trigger value="result">JSON Result</Tabs.Trigger>
       <Tabs.Trigger value="graph">Graph</Tabs.Trigger>
       <Tabs.Trigger value="executions">
         Executions ({executions.length})
       </Tabs.Trigger>
-      <Tabs.Trigger value="result">Result</Tabs.Trigger>
     </Tabs.List>
 
     <Tabs.Content value="overview" class="space-y-4">
@@ -202,7 +202,9 @@
               {dag?.dagTitle}
             </div>
             <div class="p-3 bg-muted rounded-md whitespace-pre-wrap">
-              {dag?.result?.original_request}
+              <p class="text-sm whitespace-pre-wrap">
+                {dag?.result?.original_request}
+              </p>
             </div>
             <div class="text-sm font-medium text-muted-foreground mb-2">
               Intent
@@ -331,7 +333,7 @@
     <Tabs.Content value="result" class="space-y-4">
       <Card.Root>
         <Card.Header>
-          <Card.Title>DAG Result</Card.Title>
+          <Card.Title>Decomposition Result</Card.Title>
         </Card.Header>
         <Card.Content>
           <pre

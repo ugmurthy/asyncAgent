@@ -771,6 +771,42 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/create-and-execute-dag:
+    post:
+      tags:
+        - dag
+      summary: Create and immediately execute a DAG
+      description: |
+        Create a DAG from goal text and immediately execute it if creation succeeds.
+        If clarification is needed, returns clarification response without executing.
+        Combines the create-dag and execute-dag operations into a single call.
+      operationId: createAndExecuteDAG
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDAGRequest"
+      responses:
+        "202":
+          description: DAG created and execution started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAndExecuteDAGResponse"
+        "200":
+          description: Clarification required - DAG not executed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateDAGClarificationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /api/v1/resume-dag/{executionId}:
     post:
       tags:
@@ -989,6 +1025,25 @@ paths:
                 $ref: "#/components/schemas/DAGList"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/dags/scheduled:
+    get:
+      tags:
+        - dag
+      summary: List scheduled DAGs
+      description: Retrieve all DAGs that have a cron schedule configured
+      operationId: listScheduledDags
+      responses:
+        "200":
+          description: List of scheduled DAGs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduledDAG"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -1763,6 +1818,69 @@ components:
         attempts:
           type: integer
 
+    CreateAndExecuteDAGResponse:
+      type: object
+      required:
+        - status
+        - dagId
+        - executionId
+        - originalRequest
+        - totalTasks
+        - message
+      properties:
+        status:
+          type: string
+          enum: [executing]
+        dagId:
+          type: string
+          description: The created DAG ID
+        executionId:
+          type: string
+          pattern: ^dag-exec_[a-z0-9]+$
+          description: The execution ID for tracking
+        originalRequest:
+          type: string
+          description: The original goal text
+        totalTasks:
+          type: integer
+          description: Number of sub-tasks to execute
+        usage:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: LLM usage statistics
+        generation_stats:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Generation statistics
+        message:
+          type: string
+          description: Information message about the execution
+
+    CreateDAGClarificationResponse:
+      type: object
+      required:
+        - status
+        - clarification_query
+      properties:
+        status:
+          type: string
+          enum: [clarification_required]
+        clarification_query:
+          type: string
+          description: The question that needs to be answered
+        result:
+          $ref: "#/components/schemas/DecomposerJob"
+        usage:
+          type: object
+          nullable: true
+          additionalProperties: true
+        generation_stats:
+          type: object
+          nullable: true
+          additionalProperties: true
+
     DecomposerJob:
       type: object
       required:
@@ -2016,6 +2134,32 @@ components:
               type: integer
             count:
               type: integer
+
+    ScheduledDAG:
+      type: object
+      required:
+        - id
+        - cron_schedule
+        - schedule_active
+      properties:
+        id:
+          type: string
+          description: Unique DAG identifier
+        dag_title:
+          type: string
+          nullable: true
+          description: Generated title for the DAG
+        cron_schedule:
+          type: string
+          description: Cron expression for scheduled execution
+          example: "0 9 * * *"
+        schedule_description:
+          type: string
+          description: Human-readable description of the cron schedule
+          example: "At 09:00 AM"
+        schedule_active:
+          type: boolean
+          description: Whether the cron schedule is active
 
     UpdateDAGRequest:
       type: object

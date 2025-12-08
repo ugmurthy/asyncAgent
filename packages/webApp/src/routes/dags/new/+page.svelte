@@ -26,6 +26,9 @@
   let cronSchedule = "";
   let scheduleActive = false;
   let timezone = "Asia/Kolkata";
+  
+  // Execute immediately
+  let executeImmediately = false;
 
   let isSubmitting = false;
   let errors: Record<string, string> = {};
@@ -105,15 +108,26 @@
       }
       if (scheduleActive && cronSchedule) requestBody.scheduleActive = scheduleActive;
 
-      const response = await dagApi.createDag({ requestBody });
-
-      addNotification("DAG created successfully", "success");
+      let response;
+      if (executeImmediately) {
+        response = await dagApi.createAndExecuteDag({ requestBody });
+        addNotification("DAG created and execution started", "success");
+      } else {
+        response = await dagApi.createDag({ requestBody });
+        addNotification("DAG created successfully", "success");
+      }
       
       // The response contains dagId if successful, or status: 'clarification_required'
       // @ts-ignore
       if (response.status === 'success' && response.dagId) {
          // @ts-ignore
-         goto(`/dags/${response.dagId}`);
+         if (executeImmediately && response.executionId) {
+           // @ts-ignore
+           goto(`/dag-executions/${response.executionId}`);
+         } else {
+           // @ts-ignore
+           goto(`/dags/${response.dagId}`);
+         }
       // @ts-ignore
       } else if (response.status === 'clarification_required') {
          // @ts-ignore
@@ -268,11 +282,25 @@
              type="checkbox"
              id="scheduleActive"
              bind:checked={scheduleActive}
-             class="h-4 w-4 rounded border-gray-300"
+             disabled={!cronSchedule}
+             class="h-4 w-4 rounded border-gray-300 disabled:opacity-50"
            />
-           <label for="scheduleActive" class="text-sm font-medium">
+           <label for="scheduleActive" class="text-sm font-medium {!cronSchedule ? 'text-muted-foreground' : ''}">
              Activate schedule immediately
            </label>
+         </div>
+
+         <div class="flex items-center space-x-2 pt-2 border-t">
+           <input
+             type="checkbox"
+             id="executeImmediately"
+             bind:checked={executeImmediately}
+             class="h-4 w-4 rounded border-gray-300"
+           />
+           <label for="executeImmediately" class="text-sm font-medium">
+             Create and execute immediately
+           </label>
+           <span class="text-xs text-muted-foreground">(runs DAG right after creation)</span>
          </div>
        </Card.Content>
     </Card.Root>

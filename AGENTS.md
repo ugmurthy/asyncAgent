@@ -192,3 +192,9 @@ pnpm build
 - **Shared**: Zod, TypeScript, OpenAI SDK
 - **Testing**: Vitest
 - **Tooling**: pnpm workspaces, tsx, tsup
+
+## Task Tracking with Beads
+use `bd` for all task management. Run `bd ready --json` to find next work.
+Always run `bd sync` before ending a session
+
+
