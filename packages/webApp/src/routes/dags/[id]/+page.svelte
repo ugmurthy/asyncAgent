@@ -198,7 +198,7 @@
           </div>
 
           <div>
-            <div class="text-sm font-medium text-muted-foreground mb-2">
+            <div class="text-xl text-center font-medium mb-2">
               {dag?.dagTitle}
             </div>
             <div class="p-3 bg-muted rounded-md whitespace-pre-wrap">
