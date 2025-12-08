@@ -1,46 +1,50 @@
 # Async Agent System
 
-A monorepo-based autonomous agent system that runs persistent, background AI agents with multi-provider LLM support (OpenAI, OpenRouter, Ollama).
+A monorepo-based autonomous agent system that runs persistent, background AI agents with multi-provider LLM support (OpenAI, OpenRouter, Ollama), featuring DAG-based task execution and a modern web interface.
 
 ## Features
 
 - 🤖 **Autonomous Agents** - LLM-powered decision making with tool selection
-- 🔄 **Asynchronous Execution** - Background processing with cron scheduling
+- 🔄 **DAG Execution** - Directed Acyclic Graph task decomposition and parallel execution
+- ⏰ **Scheduled Tasks** - Cron-based scheduling with timezone support
 - 💾 **Persistent State** - SQLite database maintains state across restarts
 - 🛠️ **Tool System** - Extensible tool registry (web search, fetch, file ops, webhooks, email)
 - 🎯 **Goal-Oriented** - High-level objectives drive multi-step autonomous plans
 - 🔌 **Multi-Provider LLM** - Support for OpenAI, OpenRouter, and Ollama (local models)
+- 🌐 **Web Dashboard** - Modern SvelteKit interface for monitoring and management
+- 📡 **Real-time Events** - Server-Sent Events (SSE) for live execution updates
 - ✅ **Tool Calling Validation** - Startup checks ensure model compatibility
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Clients                            │
-├──────────────┬──────────────┬──────────────────────┤
-│     CLI      │  Web Client  │   API (programmatic) │
-└──────┬───────┴──────┬───────┴──────────┬───────────┘
-       │              │                  │
-       └──────────────┴──────────────────┘
-                      │
-              ┌───────▼────────┐
-              │  Backend API   │
-              │   (Fastify)    │
-              └───────┬────────┘
-                      │
-         ┌────────────┼────────────┐
-         │            │            │
-    ┌────▼───┐   ┌───▼────┐  ┌───▼─────┐
-    │Scheduler│   │ Agent  │  │ Tools   │
-    │(cron)   │   │Runtime │  │Registry │
-    └────┬───┘   └───┬────┘  └─────────┘
-         │           │
-         └─────┬─────┘
-               │
-        ┌──────▼──────┐
-        │  SQLite DB  │
-        │  (Drizzle)  │
-        └─────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                      Clients                             │
+├──────────┬──────────────┬──────────────┬───────────────┤
+│   CLI    │   Web App    │     REPL     │  API Client   │
+│          │  (SvelteKit) │              │   (JS/Python) │
+└────┬─────┴──────┬───────┴──────┬───────┴───────┬───────┘
+     │            │              │               │
+     └────────────┴──────────────┴───────────────┘
+                          │
+                  ┌───────▼────────┐
+                  │  Backend API   │
+                  │   (Fastify)    │
+                  └───────┬────────┘
+                          │
+       ┌──────────────────┼──────────────────┐
+       │                  │                  │
+  ┌────▼────┐      ┌─────▼─────┐      ┌─────▼─────┐
+  │   DAG   │      │   Agent   │      │   Tool    │
+  │Scheduler│      │  Runtime  │      │ Registry  │
+  └────┬────┘      └─────┬─────┘      └───────────┘
+       │                 │
+       │    ┌────────────┘
+       │    │
+  ┌────▼────▼───┐
+  │  SQLite DB  │
+  │  (Drizzle)  │
+  └─────────────┘
 ```
 
 ## Quick Start
@@ -58,8 +62,8 @@ A monorepo-based autonomous agent system that runs persistent, background AI age
 
 ```bash
 # Clone the repository
-git clone <repo-url>
-cd async-agent
+git clone https://github.com/ugmurthy/asyncAgent.git
+cd asyncAgent
 
 # Install dependencies
 pnpm install
@@ -97,67 +101,146 @@ OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=mistral
 ```
 
-### Start the Backend
+### Start the System
 
 ```bash
-# Development mode
-pnpm --filter backend dev
+# Start backend in development mode
+pnpm dev
 
-# Production mode
-pnpm --filter backend start
+# Start web application (in another terminal)
+pnpm --filter @async-agent/webapp dev
 ```
 
-The server will start on `http://localhost:3000` (configurable via `PORT` in `.env`).
-
-### Use the CLI
-
-```bash
-# Install CLI globally (optional)
-cd packages/cli
-pnpm build
-npm link
-
-# Or use directly
-pnpm --filter cli dev
-
-# Available commands
-async-agent init              # Initialize configuration
-async-agent goal create       # Create a new goal
-async-agent goal list         # List all goals
-async-agent run list          # List all runs
-async-agent server status     # Check server status
-```
+- Backend API: `http://localhost:3000`
+- Web Dashboard: `http://localhost:5173`
 
 ## Project Structure
 
 ```
-async-agent/
+asyncAgent/
 ├── packages/
-│   ├── shared/              # Shared types, schemas, utilities
+│   ├── backend/              # Fastify API + Agent Runtime
 │   │   ├── src/
-│   │   │   ├── types/       # TypeScript types
-│   │   │   ├── schemas/     # Zod validation schemas
-│   │   │   └── utils/       # Utility functions
+│   │   │   ├── app/          # Server and routes
+│   │   │   ├── agent/        # DAG executor, planner, providers
+│   │   │   ├── scheduler/    # DAG scheduling
+│   │   │   ├── db/           # Database schema and migrations
+│   │   │   └── events/       # Event bus for SSE
 │   │   └── package.json
 │   │
-│   ├── backend/             # Fastify API + Agent Runtime
+│   ├── webApp/               # SvelteKit Web Interface
 │   │   ├── src/
-│   │   │   ├── app/         # Server and routes
-│   │   │   ├── agent/       # Agent orchestrator, planner, providers
-│   │   │   ├── scheduler/   # Cron scheduling
-│   │   │   ├── db/          # Database schema and client
-│   │   │   └── util/        # Logger, env validation
+│   │   │   ├── routes/       # File-based routing
+│   │   │   └── lib/          # Components, stores, utilities
 │   │   └── package.json
 │   │
-│   └── cli/                 # Command-line interface
-│       ├── src/
-│       │   ├── commands/    # CLI commands
-│       │   └── lib/         # API client, config
-│       └── package.json
+│   ├── shared/               # Shared types, schemas, utilities
+│   │   ├── src/
+│   │   ├── js-client/        # Auto-generated JS API client
+│   │   └── python-client/    # Auto-generated Python API client
+│   │
+│   ├── cli/                  # Command-line interface
+│   ├── repl/                 # Interactive REPL
+│   └── tui/                  # Terminal UI
 │
-├── .env.example             # Environment template
-├── pnpm-workspace.yaml      # Workspace configuration
-└── package.json             # Root package
+├── openapi.yaml              # API specification
+├── .env.example              # Environment template
+├── pnpm-workspace.yaml       # Workspace configuration
+└── package.json              # Root package
+```
+
+## Available Tools
+
+The agent runtime includes these built-in tools:
+
+| Tool | Description |
+|------|-------------|
+| `web_search` | Search the web using DuckDuckGo |
+| `fetch_page` | Fetch and extract content from a URL |
+| `fetch_urls` | Fetch multiple URLs in parallel |
+| `write_file` | Write content to a file |
+| `read_file` | Read content from a file |
+| `send_webhook` | Send HTTP webhook requests |
+| `send_email` | Send emails (requires SMTP configuration) |
+
+## API Endpoints
+
+Base URL: `http://localhost:3000/api/v1`
+
+### Core Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Health check |
+| `GET /health/ready` | Readiness with LLM and scheduler status |
+
+### Goals & Runs
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/v1/goals` | Create a new goal |
+| `GET /api/v1/goals` | List all goals |
+| `POST /api/v1/goals/:id/run` | Trigger goal execution |
+| `GET /api/v1/runs` | List all runs |
+| `GET /api/v1/runs/:id/steps` | Get execution steps |
+
+### DAG Operations
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/v1/create-dag` | Create a DAG from goal text |
+| `POST /api/v1/execute-dag` | Execute a DAG |
+| `POST /api/v1/resume-dag/:id` | Resume a suspended DAG |
+| `GET /api/v1/dags` | List all DAGs |
+| `GET /api/v1/dag-executions` | List DAG executions |
+| `GET /api/v1/dag-executions/:id/events` | Stream execution events (SSE) |
+
+### Task Execution
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/v1/task` | Execute a task with an agent |
+| `GET /api/v1/tools` | List available tools |
+| `GET /api/v1/agents` | List agents |
+
+See [openapi.yaml](./openapi.yaml) for complete API specification.
+
+## Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run backend in dev mode (hot reload)
+pnpm dev
+
+# Run web app in dev mode
+pnpm --filter @async-agent/webapp dev
+
+# Build all packages
+pnpm build
+
+# Run tests
+pnpm test
+
+# Clean all build outputs
+pnpm clean
+
+# Generate API clients from OpenAPI spec
+pnpm generate
+```
+
+### Database
+
+```bash
+# Generate migrations (after schema changes)
+pnpm --filter backend db:generate
+
+# Push schema changes to database
+pnpm --filter backend db:push
+
+# Open Drizzle Studio (DB GUI)
+pnpm --filter backend db:studio
 ```
 
 ## LLM Provider Support
@@ -181,53 +264,25 @@ The system validates tool calling support at startup and fails fast if the selec
 
 ## Example Use Case: AI News Monitor
 
-Create a goal that runs every Friday at 4pm:
+Create a DAG that searches and summarizes AI news:
 
 ```bash
-async-agent goal create \
-  --objective "Collect top AI news, summarize by category, and email me" \
-  --schedule "0 16 * * 5" \
-  --webhook "https://my-webhook.com/notify"
+curl -X POST http://localhost:3000/api/v1/create-dag \
+  -H "Content-Type: application/json" \
+  -d '{
+    "goal": "Search for the latest AI news, summarize the top 5 articles, and save to a markdown file",
+    "schedule": "0 9 * * *",
+    "timezone": "America/New_York"
+  }'
 ```
 
 The agent will autonomously:
-1. Search the web for recent AI news
-2. Fetch and extract content from articles
-3. Categorize and summarize findings
-4. Save results to a markdown file
-5. Send webhook notification on completion
-
-## Development
-
-```bash
-# Install dependencies
-pnpm install
-
-# Run backend in dev mode
-pnpm --filter backend dev
-
-# Run CLI in dev mode
-pnpm --filter cli dev
-
-# Build all packages
-pnpm build
-
-# Clean all build outputs
-pnpm clean
-```
-
-### Database
-
-```bash
-# Generate migrations (after schema changes)
-pnpm --filter backend db:generate
-
-# Push schema changes to database
-pnpm --filter backend db:push
-
-# Open Drizzle Studio (DB GUI)
-pnpm --filter backend db:studio
-```
+1. Decompose the goal into a DAG of tasks
+2. Search the web for recent AI news
+3. Fetch and extract content from articles
+4. Summarize findings using the LLM
+5. Save results to a markdown file
+6. Execute on schedule (daily at 9 AM ET)
 
 ## Technology Stack
 
@@ -235,15 +290,14 @@ pnpm --filter backend db:studio
 - **Fastify** - Fast HTTP server with schema validation
 - **Drizzle ORM** - Type-safe SQLite ORM
 - **node-cron** - Job scheduling
-- **OpenAI SDK** - OpenAI/OpenRouter integration
-- **ollama** - Local model support
+- **OpenAI SDK** - LLM integration
 - **Pino** - Structured logging
 
-### CLI
-- **Commander** - CLI framework
-- **Inquirer** - Interactive prompts
-- **Chalk** - Colored output
-- **Ora** - Spinners and progress indicators
+### Web App
+- **SvelteKit 5** - Full-stack framework
+- **TailwindCSS** - Utility-first CSS
+- **bits-ui** - Accessible UI components
+- **Lucide Svelte** - Icons
 
 ### Shared
 - **TypeScript** - Type safety across packages
@@ -255,14 +309,19 @@ pnpm --filter backend db:studio
 - [x] Monorepo setup with pnpm workspaces
 - [x] Multi-provider LLM abstraction layer
 - [x] Shared types and schemas
-- [x] Basic backend structure
-- [x] Basic CLI structure
-- [ ] Database schema and migrations
-- [ ] Agent orchestrator and planner
-- [ ] Tool registry and core tools
-- [ ] Scheduler implementation
-- [ ] Complete CLI commands
-- [ ] Web dashboard (future)
+- [x] Backend API structure
+- [x] Database schema and migrations
+- [x] DAG executor and planner
+- [x] Tool registry and core tools
+- [x] DAG scheduler with cron support
+- [x] Auto-generated API clients (JS/Python)
+- [x] Web dashboard (SvelteKit)
+- [x] Real-time events (SSE)
+- [x] Suspended state and resume functionality
+- [ ] CLI improvements
+- [ ] WebSocket support for bidirectional communication
+- [ ] Agent memory and learning
+- [ ] Plugin system for custom tools
 
 ## License
 
@@ -270,4 +329,4 @@ MIT
 
 ## Contributing
 
-Contributions welcome! Please read the implementation plan in [ASYNC_AGENT_PLAN.md](./ASYNC_AGENT_PLAN.md) for architecture details.
+Contributions welcome! See [AGENTS.md](./AGENTS.md) for development guidelines.
