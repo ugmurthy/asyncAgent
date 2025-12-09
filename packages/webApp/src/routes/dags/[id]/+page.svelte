@@ -201,7 +201,7 @@
             <div class="text-xl text-center font-medium mb-2">
               {dag?.dagTitle}
             </div>
-            <div class="p-3 bg-muted rounded-md whitespace-pre-wrap">
+            <div class="p-3 bg-muted rounded-md whitespace-pre-wrap overflow-y-auto" style="height: 240px;">
               <p class="text-sm whitespace-pre-wrap">
                 {dag?.result?.original_request}
               </p>

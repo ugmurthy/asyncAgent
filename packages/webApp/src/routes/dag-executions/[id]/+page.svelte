@@ -304,90 +304,95 @@
     </Button>
   </div>
 
-  <div class="space-y-6">
-    <Card.Root>
-      <Card.Header>
-        <div class="flex items-start justify-between">
-          <div>
-            <Card.Title>DAG Execution Details</Card.Title>
-            <Card.Description>Execution ID: {execution.id}</Card.Description>
-          </div>
-          <div class="flex gap-2">
-            {#if execution.status === "suspended" || execution.status === "failed"}
-              <Button onclick={resumeExecution} variant="outline">
-                Resume
-              </Button>
-            {/if}
-            <Button onclick={deleteExecution} variant="destructive">
-              Delete
-            </Button>
-          </div>
-        </div>
-      </Card.Header>
-      <Card.Content>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <p class="text-sm font-medium text-gray-500">Status</p>
-            <StatusBadge status={execution.status} />
-          </div>
-          <div>
-            <p class="text-sm font-medium text-gray-500">DAG ID</p>
-            <p class="text-sm">
-              <a
-                href={`/dags/${execution.dagId}`}
-                class="text-blue-600 hover:underline"
-              >
-                {execution.dagId}
-              </a>
-            </p>
-          </div>
-          <div>
-            <p class="text-sm font-medium text-gray-500">Started At</p>
-            <p class="text-sm">
-              {execution.startedAt
-                ? formatDate(execution.startedAt)
-                : "Not started"}
-            </p>
-          </div>
-          <div>
-            <p class="text-sm font-medium text-gray-500">Completed At</p>
-            <p class="text-sm">
-              {execution.completedAt
-                ? formatDate(execution.completedAt)
-                : "Not completed"}
-            </p>
-          </div>
+  <Tabs.Root value="tab-three" class="w-full">
+    <Tabs.List class="grid w-full grid-cols-5">
+      <Tabs.Trigger value="tab-one">The Task</Tabs.Trigger>
+      <Tabs.Trigger value="tab-two">Result</Tabs.Trigger>
+      <Tabs.Trigger value="tab-three">Graph</Tabs.Trigger>
+      <Tabs.Trigger value="tab-four">Events</Tabs.Trigger>
+      <Tabs.Trigger value="tab-five">Steps</Tabs.Trigger>
+    </Tabs.List>
 
-          {#if execution.error}
-            <div class="col-span-2">
-              <p class="text-sm font-medium text-gray-500">Error</p>
-              <p class="text-sm text-red-600">{execution.error}</p>
+    <Tabs.Content value="tab-one" class="space-y-4">
+      <Card.Root>
+        <Card.Header>
+          <div class="flex items-start justify-between">
+            <div>
+              <Card.Title>DAG Execution Details</Card.Title>
+              <Card.Description>Execution ID: {execution.id}</Card.Description>
             </div>
-          {/if}
-        </div>
-        <div>
-          <p class="pt-4">Requested Task</p>
-          <hr />
-          <p class="text-sm whitespace-pre-wrap">
-            {execution.originalRequest}
-          </p>
-        </div>
-      </Card.Content>
-    </Card.Root>
+            <div class="flex gap-2">
+              {#if execution.status === "suspended" || execution.status === "failed"}
+                <Button onclick={resumeExecution} variant="outline">
+                  Resume
+                </Button>
+              {/if}
+              <Button onclick={deleteExecution} variant="destructive">
+                Delete
+              </Button>
+            </div>
+          </div>
+        </Card.Header>
+        <Card.Content>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm font-medium text-gray-500">Status</p>
+              <StatusBadge status={execution.status} />
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-500">DAG ID</p>
+              <p class="text-sm">
+                <a
+                  href={`/dags/${execution.dagId}`}
+                  class="text-blue-600 hover:underline"
+                >
+                  {execution.dagId}
+                </a>
+              </p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-500">Started At</p>
+              <p class="text-sm">
+                {execution.startedAt
+                  ? formatDate(execution.startedAt)
+                  : "Not started"}
+              </p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-500">Completed At</p>
+              <p class="text-sm">
+                {execution.completedAt
+                  ? formatDate(execution.completedAt)
+                  : "Not completed"}
+              </p>
+            </div>
 
-    <Card.Root>
-      <Card.Header>
-        <div
-          class="flex items-center justify-between cursor-pointer"
-          onclick={() => (showResults = !showResults)}
-        >
+            {#if execution.error}
+              <div class="col-span-2">
+                <p class="text-sm font-medium text-gray-500">Error</p>
+                <p class="text-sm text-red-600">{execution.error}</p>
+              </div>
+            {/if}
+          </div>
+          <div>
+            <p class="pt-4">Requested Task</p>
+            <hr />
+            <div
+              class="text-sm whitespace-pre-wrap h-80 overflow-y-auto border rounded bg-gray-50 p-3"
+            >
+              {execution.originalRequest}
+            </div>
+          </div>
+        </Card.Content>
+      </Card.Root>
+    </Tabs.Content>
+
+    <Tabs.Content value="tab-two" class="space-y-4">
+      <Card.Root>
+        <Card.Header>
           <Card.Title>Results of Execution</Card.Title>
-          <Button variant="ghost" size="sm">
-            {showResults ? "Collapse" : "Expand"}
-          </Button>
-        </div>
-      </Card.Header>
-      {#if showResults}
+        </Card.Header>
+
         <Card.Content>
           {#if loadingResults}
             <div class="flex justify-center p-4">
@@ -403,144 +408,155 @@
             <p class="text-gray-500 italic">No results available.</p>
           {/if}
         </Card.Content>
-      {/if}
-    </Card.Root>
+      </Card.Root>
+    </Tabs.Content>
 
-    <Card.Root>
-      <Card.Header>
-        <Card.Title>Execution Flow</Card.Title>
-      </Card.Header>
-      <Card.Content>
-        <MermaidDiagram chart={executionChart} id="execution-{execution.id}" />
-      </Card.Content>
-    </Card.Root>
-
-    <Card.Root>
-      <Card.Header>
-        <Card.Title>Events Stream</Card.Title>
-        <Card.Description>Real-time execution events</Card.Description>
-      </Card.Header>
-      <Card.Content>
-        <div
-          bind:this={eventsContainer}
-          class="h-96 overflow-y-auto border rounded-lg bg-gray-50 p-4 space-y-2"
-        >
-          {#if events.length === 0}
-            <p class="text-gray-500 italic text-sm">Waiting for events...</p>
-          {:else}
-            {#each events as event}
-              <div
-                class="border-l-4 border-blue-500 bg-white p-3 rounded shadow-sm"
-              >
-                <div class="flex items-start justify-between mb-1">
-                  <Badge
-                    class={event.type.includes("failed")
-                      ? "bg-red-100 text-red-800"
-                      : event.type.includes("completed")
-                        ? "bg-green-100 text-green-800"
-                        : "bg-blue-100 text-blue-800"}
-                  >
-                    {event.type}
-                  </Badge>
-                  <span class="text-xs text-gray-500">
-                    {formatRelativeTime(event.timestamp)}
-                  </span>
-                </div>
-                <pre
-                  class="text-xs overflow-x-auto bg-gray-50 p-2 rounded mt-2">{JSON.stringify(
-                    event,
-                    null,
-                    2
-                  )}</pre>
-              </div>
-            {/each}
-          {/if}
-        </div>
-      </Card.Content>
-    </Card.Root>
-
-    <Card.Root>
-      <Card.Header>
-        <Card.Title>Execution Steps</Card.Title>
-        <Card.Description>
-          {subSteps.length} step{subSteps.length !== 1 ? "s" : ""}
-        </Card.Description>
-      </Card.Header>
-      <Card.Content>
-        {#if subSteps.length === 0}
-          <EmptyState
-            title="No steps found"
-            description="This execution has no sub-steps yet."
+    <Tabs.Content value="tab-three" class="space-y-4">
+      <Card.Root>
+        <Card.Header>
+          <Card.Title>Execution Flow</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <MermaidDiagram
+            chart={executionChart}
+            id="execution-{execution.id}"
           />
-        {:else}
-          <Table.Root>
-            <Table.Header>
-              <Table.Row>
-                <Table.Head class="text-left"
-                  >Task (Tool) Dependent/s</Table.Head
+        </Card.Content>
+      </Card.Root>
+    </Tabs.Content>
+
+    <Tabs.Content value="tab-four" class="space-y-4">
+      <Card.Root>
+        <Card.Header>
+          <Card.Title>Events Stream</Card.Title>
+          <Card.Description>Real-time execution events</Card.Description>
+        </Card.Header>
+        <Card.Content>
+          <div
+            bind:this={eventsContainer}
+            class="h-96 overflow-y-auto border rounded-lg bg-gray-50 p-4 space-y-2"
+          >
+            {#if events.length === 0}
+              <p class="text-gray-500 italic text-sm">Waiting for events...</p>
+            {:else}
+              {#each events as event}
+                <div
+                  class="border-l-4 border-blue-500 bg-white p-3 rounded shadow-sm"
                 >
-                <Table.Head>Status</Table.Head>
-                <Table.Head>Started At</Table.Head>
-                <Table.Head>Completed At</Table.Head>
-                <Table.Head>Result</Table.Head>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {#each subSteps as step}
-                <Table.Row>
-                  <Table.Cell
-                    class="font-mono text-sm"
-                    title={JSON.stringify(step.toolOrPromptParams, null, 2)}
-                  >
-                    {step.taskId}
-                    ({step.toolOrPromptName})
-                    {step.dependencies}
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Badge class={getStatusColor(step.status)}>
-                      {step.status}
+                  <div class="flex items-start justify-between mb-1">
+                    <Badge
+                      class={event.type.includes("failed")
+                        ? "bg-red-100 text-red-800"
+                        : event.type.includes("completed")
+                          ? "bg-green-100 text-green-800"
+                          : "bg-blue-100 text-blue-800"}
+                    >
+                      {event.type}
                     </Badge>
-                  </Table.Cell>
-                  <Table.Cell class="text-sm">
-                    {step.startedAt ? formatRelativeTime(step.startedAt) : "-"}
-                  </Table.Cell>
-                  <Table.Cell class="text-sm">
-                    {step.completedAt
-                      ? formatRelativeTime(step.completedAt)
-                      : "-"}
-                  </Table.Cell>
-                  <Table.Cell class="max-w-md">
-                    {#if step.result}
-                      <details class="text-sm">
-                        <summary class="cursor-pointer text-blue-600">
-                          View result
-                        </summary>
-                        <div
-                          class="mt-2 p-2 bg-gray-50 rounded text-xs overflow-x-auto max-h-96 overflow-y-auto"
-                        >
-                          {#if typeof step.result === "string"}
-                            <MarkdownRenderer source={step.result} />
-                          {:else}
-                            <MarkdownRenderer
-                              source={"```json\n" +
-                                JSON.stringify(step.result, null, 2) +
-                                "\n```"}
-                            />
-                          {/if}
-                        </div>
-                      </details>
-                    {:else if step.error}
-                      <p class="text-sm text-red-600">{step.error}</p>
-                    {:else}
-                      <span class="text-gray-400">-</span>
-                    {/if}
-                  </Table.Cell>
-                </Table.Row>
+                    <span class="text-xs text-gray-500">
+                      {formatRelativeTime(event.timestamp)}
+                    </span>
+                  </div>
+                  <pre
+                    class="text-xs overflow-x-auto bg-gray-50 p-2 rounded mt-2">{JSON.stringify(
+                      event,
+                      null,
+                      2
+                    )}</pre>
+                </div>
               {/each}
-            </Table.Body>
-          </Table.Root>
-        {/if}
-      </Card.Content>
-    </Card.Root>
-  </div>
+            {/if}
+          </div>
+        </Card.Content>
+      </Card.Root>
+    </Tabs.Content>
+
+    <Tabs.Content value="tab-five" class="space-y-4">
+      <Card.Root>
+        <Card.Header>
+          <Card.Title>Execution Steps</Card.Title>
+          <Card.Description>
+            {subSteps.length} step{subSteps.length !== 1 ? "s" : ""}
+          </Card.Description>
+        </Card.Header>
+        <Card.Content>
+          {#if subSteps.length === 0}
+            <EmptyState
+              title="No steps found"
+              description="This execution has no sub-steps yet."
+            />
+          {:else}
+            <Table.Root>
+              <Table.Header>
+                <Table.Row>
+                  <Table.Head class="text-left"
+                    >Task (Tool) Dependent/s</Table.Head
+                  >
+                  <Table.Head>Status</Table.Head>
+                  <Table.Head>Started At</Table.Head>
+                  <Table.Head>Completed At</Table.Head>
+                  <Table.Head>Result</Table.Head>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {#each subSteps as step}
+                  <Table.Row>
+                    <Table.Cell
+                      class="font-mono text-sm"
+                      title={JSON.stringify(step.toolOrPromptParams, null, 2)}
+                    >
+                      {step.taskId}
+                      ({step.toolOrPromptName})
+                      {step.dependencies}
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Badge class={getStatusColor(step.status)}>
+                        {step.status}
+                      </Badge>
+                    </Table.Cell>
+                    <Table.Cell class="text-sm">
+                      {step.startedAt
+                        ? formatRelativeTime(step.startedAt)
+                        : "-"}
+                    </Table.Cell>
+                    <Table.Cell class="text-sm">
+                      {step.completedAt
+                        ? formatRelativeTime(step.completedAt)
+                        : "-"}
+                    </Table.Cell>
+                    <Table.Cell class="max-w-md">
+                      {#if step.result}
+                        <details class="text-sm">
+                          <summary class="cursor-pointer text-blue-600">
+                            View result
+                          </summary>
+                          <div
+                            class="mt-2 p-2 bg-gray-50 rounded text-xs overflow-x-auto max-h-96 overflow-y-auto"
+                          >
+                            {#if typeof step.result === "string"}
+                              <MarkdownRenderer source={step.result} />
+                            {:else}
+                              <MarkdownRenderer
+                                source={"```json\n" +
+                                  JSON.stringify(step.result, null, 2) +
+                                  "\n```"}
+                              />
+                            {/if}
+                          </div>
+                        </details>
+                      {:else if step.error}
+                        <p class="text-sm text-red-600">{step.error}</p>
+                      {:else}
+                        <span class="text-gray-400">-</span>
+                      {/if}
+                    </Table.Cell>
+                  </Table.Row>
+                {/each}
+              </Table.Body>
+            </Table.Root>
+          {/if}
+        </Card.Content>
+      </Card.Root>
+    </Tabs.Content>
+  </Tabs.Root>
 </div>
