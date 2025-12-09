@@ -21,4 +21,4 @@ export const apiClient = new AsyncAgentClient({
 });
 
 // Export individual services for convenience
-export const { goals, runs, agents, health, dag, artifacts } = apiClient;
+export const { goals, runs, agents, health, dag, artifacts, task } = apiClient;

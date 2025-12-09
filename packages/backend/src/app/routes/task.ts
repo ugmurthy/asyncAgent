@@ -76,6 +76,7 @@ export async function taskRoutes(fastify: FastifyInstance) {
 
       log.info({
         taskName,
+        prompt,
         provider,
         model,
         hasFiles: files.length > 0,
@@ -103,7 +104,7 @@ export async function taskRoutes(fastify: FastifyInstance) {
         runId: 'task-' + Date.now(),
         stepId: 'step-' + Date.now(),
       });
-
+      log.info({ result }, 'Task execution completed');
       return reply.send({
         taskName,
         agentName: agent.name,

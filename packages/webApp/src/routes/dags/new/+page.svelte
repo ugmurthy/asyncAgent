@@ -4,7 +4,7 @@
   import { Input } from "$lib/ui/input";
   import { Textarea } from "$lib/ui/textarea";
   import * as Card from "$lib/ui/card";
-  import { dag as dagApi, agents as agentsApi } from "$lib/api/client";
+  import { dag as dagApi, agents as agentsApi, task as taskApi } from "$lib/api/client";
   import { addNotification } from "$lib/stores/notifications";
   import { onMount } from "svelte";
   import { page } from "$app/stores";
@@ -31,7 +31,31 @@
   let executeImmediately = false;
 
   let isSubmitting = false;
+  let isEnhancing = false;
   let errors: Record<string, string> = {};
+
+  async function handleEnhance() {
+    if (!goalText.trim()) return;
+    
+    isEnhancing = true;
+    try {
+      const response = await taskApi.executeTask({
+        formData: {
+          taskName: "ParaphrasePro",
+          prompt: goalText.trim(),
+        },
+      });
+      if (response.response) {
+        goalText = response.response;
+        addNotification("Goal description enhanced", "success");
+      }
+    } catch (error: any) {
+      console.error("Failed to enhance goal:", error);
+      addNotification(error.message || "Failed to enhance goal description", "error");
+    } finally {
+      isEnhancing = false;
+    }
+  }
 
   onMount(async () => {
     const initialGoal = $page.url.searchParams.get("initialGoal");
@@ -46,10 +70,15 @@
       agents = response.agents || response || [];
       
       if (Array.isArray(agents)) {
-        // Select first active agent by default
-        const activeAgent = agents.find(a => a.active);
-        if (activeAgent) {
-            agentName = activeAgent.name;
+        // Default to DecomposerV7 if available, otherwise first active agent
+        const decomposerV7 = agents.find(a => a.name === "DecomposerV7");
+        if (decomposerV7) {
+            agentName = decomposerV7.name;
+        } else {
+            const activeAgent = agents.find(a => a.active);
+            if (activeAgent) {
+                agentName = activeAgent.name;
+            }
         }
       }
     } catch (error: any) {
@@ -183,6 +212,17 @@
             rows={5}
             class={errors.goalText ? "border-destructive" : ""}
           />
+          <div class="flex justify-end">
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm"
+              disabled={!goalText.trim() || isEnhancing}
+              onclick={handleEnhance}
+            >
+              {isEnhancing ? "Enhancing..." : "Enhance"}
+            </Button>
+          </div>
           {#if errors.goalText}
             <p class="text-sm text-destructive">{errors.goalText}</p>
           {/if}
