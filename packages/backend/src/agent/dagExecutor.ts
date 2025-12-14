@@ -51,6 +51,11 @@ export interface DAGExecutorConfig {
   db: Database;
 }
 
+export interface GlobalContext {
+  formatted: string;
+  totalTasks: number;
+}
+
 export class DAGExecutor {
   constructor(private config: DAGExecutorConfig) {
     this.config.logger.info({
@@ -117,6 +122,56 @@ export class DAGExecutor {
     }).filter(url => url.length > 0);
   }
 
+  private buildGlobalContext(job: DecomposerJob): GlobalContext {
+    const entitiesStr = job.entities.length > 0
+      ? job.entities.map(e => `• ${e.entity} (${e.type}): ${e.grounded_value}`).join('\n')
+      : 'None';
+
+    const formatted = `# Global Context
+**Request:** ${job.original_request}
+**Primary Intent:** ${job.intent.primary}
+**Sub-intents:** ${job.intent.sub_intents.join('; ') || 'None'}
+**Entities:**
+${entitiesStr}
+**Synthesis Goal:** ${job.synthesis_plan}`;
+
+    return { formatted, totalTasks: job.sub_tasks.length };
+  }
+
+  private buildInferencePrompt(
+    task: SubTask,
+    globalContext: GlobalContext,
+    taskResults: Map<string, any>
+  ): string {
+    const MAX_DEP_LENGTH = 2000;
+
+    const depsStr = task.dependencies
+      .filter(id => id !== 'none' && taskResults.has(id))
+      .map(id => {
+        const result = taskResults.get(id);
+        const str = typeof result === 'string' ? result : JSON.stringify(result);
+        return `[Task ${id}]: ${str.length > MAX_DEP_LENGTH ? str.slice(0, MAX_DEP_LENGTH) + '...' : str}`;
+      })
+      .join('\n\n') || 'None';
+
+    return `You are an expert assistant executing a sub-task within a larger workflow.
+
+${globalContext.formatted}
+
+# Current Task [${task.id}/${globalContext.totalTasks}]
+**Description:** ${task.description}
+**Reasoning:** ${task.thought}
+**Expected Output:** ${task.expected_output}
+
+# Dependencies
+${depsStr}
+
+# Instruction
+${task.tool_or_prompt.params?.prompt || task.description}
+
+Respond with ONLY the expected output format. Build upon dependencies for coherence and align with the global context.`;
+  }
+
   private resolveDependencies(
     params: Record<string, any>,
     taskResults: Map<string, any>,
@@ -146,12 +201,82 @@ export class DAGExecutor {
       //if (value.match(DEPENDENCY_PATTERN)) {
          this.handleMultipleMatches(value, key, tool, taskResults, logger, resolvedParams);
       //}
-      
+      // experimental function to detect dependencies
+      const result=this.extractTaskNumbers(value);
+      if (result.length>0){
+        logger.info({result},'result');
+      } 
     }
 
     //logger.debug({ resolvedParams, singleDependency }, 'resolvedParams, singleDependency');
     return { resolvedParams, singleDependency };
   }
+
+  private  extractTaskNumbers(text:string) {
+    const results = [];
+
+    // Helper to add a result
+    const addResult = (numbers, matchedText) => {
+        const sorted = [...new Set(numbers)].sort((a, b) => a - b);
+        results.push({
+            numbers: sorted,
+            text: matchedText.trim()
+        });
+    };
+
+    const seenTexts = new Set(); // avoid duplicates from overlapping matches
+
+    // ──────────────────────────────────────────────────────────────
+    // 1. Range patterns: "Task 1 to Task 5", "Tasks 3–7", "Task8-Task12"
+    // ──────────────────────────────────────────────────────────────
+    const rangeRegex = /\b(Task|Tasks)\b[\s\S]*?\b(\d+)\s*(?:to|through|[-–—−])\s*\b(\d+)\b/gi;
+    let match;
+    while ((match = rangeRegex.exec(text)) !== null) {
+        const start = parseInt(match[2], 10);
+        const end = parseInt(match[3], 10);
+        const numbers = [];
+        for (let i = start; i <= end; i++) numbers.push(i);
+
+        const matchedText = match[0];
+        if (!seenTexts.has(matchedText)) {
+            seenTexts.add(matchedText);
+            addResult(numbers, matchedText);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 2. List patterns: "Task 1 and Task 3", "Tasks 2, 4, and 6", etc.
+    // ──────────────────────────────────────────────────────────────
+    const listRegex = /\b(Task|Tasks)[\s\S]*?\b(and|&)\b[\s\S]*?\b\d+\b/gi;
+    while ((match = listRegex.exec(text)) !== null) {
+        const segment = match[0];
+        const numMatches = [...segment.matchAll(/\b\d+\b/g)];
+        const numbers = numMatches.map(m => parseInt(m[0], 10));
+
+        if (numbers.length >= 2) {
+            if (!seenTexts.has(segment)) {
+                seenTexts.add(segment);
+                addResult(numbers, segment);
+            }
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 3. Single task: "Just Task 10", "Task15", etc.
+    // ──────────────────────────────────────────────────────────────
+    const singleRegex = /\b(Task|Tasks)\b[\s#:]*\b(\d+)\b(?![\s\S]*?(?:to|through|[-–—−]|and|&))/gi;
+    while ((match = singleRegex.exec(text)) !== null) {
+        const num = parseInt(match[2], 10);
+        const matchedText = match[0].trim();
+        if (!seenTexts.has(matchedText)) {
+            seenTexts.add(matchedText);
+            addResult([num], matchedText);
+        }
+    }
+
+    return results;
+}
+
 
   private handleExactMatch(
     exactMatch: RegExpMatchArray,
@@ -367,6 +492,7 @@ export class DAGExecutor {
 
     const taskResults = new Map<string, any>();
     const executedTasks = new Set<string>();
+    const globalContext = this.buildGlobalContext(job);
 
     try {
       const canExecute = (task: SubTask): boolean => {
@@ -417,24 +543,8 @@ export class DAGExecutor {
 
         return result;
       } else if (task.action_type === 'inference') {
-        const params = task.tool_or_prompt.params || {};
-        const { resolvedParams } = this.resolveDependencies(params, taskResults, logger);
-
-        const promptText = resolvedParams.prompt || task.description;
-        
-        const context: Record<string, any> = {};
-        for (const depId of task.dependencies) {
-          if (depId !== 'none' && taskResults.has(depId)) {
-            context[`task_${depId}`] = taskResults.get(depId);
-          }
-        }
-
-        const contextStr = Object.entries(context)
-          .map(([key, value]) => `${key}: ${JSON.stringify(value, null, 2)}`)
-          .join('\n\n');
-
-        const fullPrompt = `${promptText}\n\nContext from previous tasks:\n${contextStr}`;
-
+        const fullPrompt = this.buildInferencePrompt(task, globalContext, taskResults);
+        //logger.info({fullPrompt},'fullPrompt');
         // Get agent details using agentName from task
         const agentName = task.tool_or_prompt.name;
         const agent = await db.query.agents.findFirst({

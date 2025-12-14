@@ -6,6 +6,7 @@ import { WriteFileTool } from './writeFile.js';
 import { ReadFileTool } from './readFile.js';
 import { SendWebhookTool } from './sendWebhook.js';
 import { SendEmailTool } from './sendEmail.js';
+import { ExplainCodeTool } from './explainCode.js';
 //import { LlmExecuteTool } from './llmExecute.js';
 
 export class ToolRegistry {
@@ -23,6 +24,7 @@ export class ToolRegistry {
     this.register(new ReadFileTool());
     this.register(new SendWebhookTool());
     this.register(new SendEmailTool());
+    this.register(new ExplainCodeTool());
     //this.register(new LlmExecuteTool());
   }
 
@@ -66,4 +68,5 @@ export * from './writeFile.js';
 export * from './readFile.js';
 export * from './sendWebhook.js';
 export * from './sendEmail.js';
+export * from './explainCode.js';
 export * from './llmExecute.js';

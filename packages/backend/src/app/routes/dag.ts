@@ -26,6 +26,81 @@ function extractJsonCodeBlock(response: string): unknown {
   return JSON.parse(jsonMatch[1].trim());
 }
 
+/**
+ * Extracts and parses JSON content from a markdown code block with detailed diagnostics.
+ * Provides specific error locations and context for large JSON objects.
+ * @param response - The markdown string containing a JSON code block
+ * @returns The parsed JSON object
+ * @throws Error with detailed diagnostics if extraction or parsing fails
+ */
+function extractCodeBlock(response: string): unknown {
+  // Try to find ```json code block
+  const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+  if (!jsonMatch || !jsonMatch[1]) {
+    // Fallback: try to find any ``` code block
+    const anyMatch = response.match(/```\s*([\s\S]*?)\s*```/);
+    if (!anyMatch || !anyMatch[1]) {
+      throw new Error('No JSON code block found in response');
+    }
+  }
+
+  const jsonContent = (jsonMatch?.[1] || response).trim();
+
+  // Attempt to parse JSON
+  try {
+    return JSON.parse(jsonContent);
+  } catch (parseError) {
+    // Provide detailed diagnostics
+    const error = parseError as SyntaxError;
+    const errorMessage = error.message;
+
+    // Try to extract line and position info from error message
+    const positionMatch = errorMessage.match(/position (\d+)/);
+    const position = positionMatch ? parseInt(positionMatch[1], 10) : null;
+
+    // Find line number from position
+    let lineNumber = 1;
+    let columnNumber = 1;
+    let currentPos = 0;
+
+    if (position !== null) {
+      const lines = jsonContent.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const lineLength = lines[i].length + 1; // +1 for newline
+        if (currentPos + lineLength > position) {
+          lineNumber = i + 1;
+          columnNumber = position - currentPos + 1;
+          break;
+        }
+        currentPos += lineLength;
+      }
+    }
+
+    // Extract context around error
+    const lines = jsonContent.split('\n');
+    const contextStart = Math.max(0, lineNumber - 3);
+    const contextEnd = Math.min(lines.length, lineNumber + 2);
+    const context = lines
+      .slice(contextStart, contextEnd)
+      .map((line, idx) => {
+        const actualLineNum = contextStart + idx + 1;
+        const marker = actualLineNum === lineNumber ? '>>> ' : '    ';
+        return `${marker}${String(actualLineNum).padStart(4, ' ')}: ${line}`;
+      })
+      .join('\n');
+
+    const diagnosticMessage = [
+      `JSON Parse Error: ${errorMessage}`,
+      `Location: Line ${lineNumber}, Column ${columnNumber}`,
+      `Content Preview (lines ${contextStart + 1}-${contextEnd}):`,
+      context,
+      `Total size: ${jsonContent.length} characters, ${lines.length} lines`,
+    ].join('\n');
+
+    throw new Error(diagnosticMessage);
+  }
+}
+
 function truncate(str:string,numChars=2000):string {
   if (str.length <= numChars) return str;
   return str.slice(0, numChars);
@@ -190,6 +265,11 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         .replace(/\{\{currentDate\}\}/g, new Date().toLocaleString());
 
       let currentGoalText = goalText;
+
+      // Look here to replace place holders in goaltext
+      currentGoalText = currentGoalText
+         .replace(/\{\{currentDate\}\}/g, new Date().toLocaleString());
+
       let showGoalText = goalText.length>50?`${goalText.slice(0,50)}...`:goalText;
       let attempt = 0;
       const maxAttempts = 3;
@@ -220,8 +300,9 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         }
 
         let result;
+        //log.info({ response }, 'LLM response');
         try {
-          result = extractJsonCodeBlock(response.content);
+          result = extractCodeBlock(response.content);
         } catch (parseError) {
           log.error({ 
             err: parseError, 
@@ -514,7 +595,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
           maxTokens: body.max_tokens ?? 10000,
           ...(body.seed !== undefined && { seed: body.seed }),
         });
-
+        
         const MAX_RESPONSE_SIZE = 100_000;
         if (response.content.length > MAX_RESPONSE_SIZE) {
           log.error({ responseSize: response.content.length }, 'LLM response exceeds size limit');
@@ -527,6 +608,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
 
         let result;
         try {
+          
           result = extractJsonCodeBlock(response.content);
         } catch (parseError) {
           log.error({ 
