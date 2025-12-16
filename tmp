@@ -1,0 +1,24 @@
+function extractSearchQueries(text) {
+  // Split the input into lines
+  const lines = text.trim().split('\n');
+
+  // Process each line and extract the content inside the quotes (if present)
+  // This works for both ordered lists (1., 2., etc.) and unordered (*, -, etc.)
+  const queries = lines
+    .map(line => {
+      // Remove leading whitespace, numbers, bullets, and optional trailing dots/spaces
+      let cleaned = line.trim().replace(/^(\d+\.|\*\s*|\-\s*|\•\s*)/, '').trim();
+
+      // Extract the part inside double quotes, if quotes exist
+      const match = cleaned.match(/"([^"]*)"/);
+      if (match) {
+        return match[1]; // Return the content inside the quotes
+      }
+
+      // If no quotes, return the cleaned line (fallback)
+      return cleaned;
+    })
+    .filter(query => query.length > 5); // Remove any empty results
+
+  return queries;
+}

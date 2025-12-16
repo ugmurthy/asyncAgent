@@ -79,7 +79,7 @@
   let showStepModal = $state(false);
 
   let lastStep = $derived(
-    subSteps.length > 0 ? subSteps[subSteps.length - 1] : null
+    subSteps.length > 0 ? subSteps.find(s => s.taskId === String(subSteps.length)) || null : null
   );
   $effect(() => {
     console.log("subSteps : ", subSteps);

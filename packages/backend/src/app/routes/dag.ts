@@ -343,6 +343,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         const dag = validatedResult.data;
 
         if (dag.clarification_needed) {
+          log.info({ clarification_query: dag.clarification_query }, 'Clarification required');
           return reply.code(200).send({
             status: 'clarification_required',
             clarification_query: dag.clarification_query,

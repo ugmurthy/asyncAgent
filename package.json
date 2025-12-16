@@ -5,7 +5,9 @@
   "description": "Autonomous async agent system with multi-provider LLM support",
   "scripts": {
     "dev": "pnpm --filter backend dev",
+    "dev:web": "pnpm --filter @async-agent/webapp dev",
     "build": "pnpm -r build",
+    "build:web": "pnpm --filter @async-agent/webapp build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean && rm -rf node_modules",

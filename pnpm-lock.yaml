@@ -90,6 +90,9 @@ importers:
       p-queue:
         specifier: ^8.0.1
         version: 8.1.1
+      parallel-web:
+        specifier: ^0.2.4
+        version: 0.2.4
       pino:
         specifier: ^8.17.2
         version: 8.21.0
@@ -3943,6 +3946,9 @@ packages:
 
   pako@2.1.0:
     resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
+
+  parallel-web@0.2.4:
+    resolution: {integrity: sha512-684TtVFf0wvyZ83FMrhxX1Qg0+PDjsB7bPu0SXBCRVywxSeOloFIKHPKiAsAKWpDgAz3ok/bZmd2CAXImqH3Iw==}
 
   parse5-htmlparser2-tree-adapter@7.1.0:
     resolution: {integrity: sha512-ruw5xyKs6lrpo9x9rCZqZZnIUntICjQAd0Wsmp396Ul9lN/h+ifgVV1x1gZHi8euej6wTfpqX8j+BFQxF0NS/g==}
@@ -8939,6 +8945,8 @@ snapshots:
   package-manager-detector@1.5.0: {}
 
   pako@2.1.0: {}
+
+  parallel-web@0.2.4: {}
 
   parse5-htmlparser2-tree-adapter@7.1.0:
     dependencies:
