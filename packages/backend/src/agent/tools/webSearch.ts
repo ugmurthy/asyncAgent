@@ -4,8 +4,8 @@ import type { ToolContext } from '@async-agent/shared';
 import * as cheerio from 'cheerio';
 
 const webSearchInputSchema = z.object({
-  query: z.string().describe('The search query'),
-  limit: z.number().int().min(1).max(20).default(10).describe('Number of results to return'),
+  query: z.string().describe('The search query - could be list of bulleted queries '),
+  limit: z.number().int().min(1).max(20).default(10).describe('Number of results to return per query'),
 });
 
 type WebSearchInput = z.infer<typeof webSearchInputSchema>;
@@ -22,31 +22,74 @@ export class WebSearchTool extends BaseTool<WebSearchInput, SearchResult[]> {
   inputSchema = webSearchInputSchema;
 
   async execute(input: WebSearchInput, ctx: ToolContext): Promise<SearchResult[]> {
-    ctx.logger.info({query:input.query},`  ╰─Searching web...`);
+    ctx.logger.info({query:input.query},`  ╰─Searching web...input`);
+    const queries = this.extractSearchQueries(input.query);
+    ctx.logger.info({queries},`  ╰─Searching web...input as list`);
+    const allResults: SearchResult[][] = [];
 
-    try {
-      // Using DuckDuckGo HTML search (no API key needed)
-      const response = await this.withTimeout(
-        fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(input.query)}`),
-        10000,
-        'Web search timed out'
-      );
+    for (const query of queries) {
+      try {
+        // Using DuckDuckGo HTML search (no API key needed)
+        const response = await this.withTimeout(
+          fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`),
+          10000,
+          'Web search timed out'
+        );
 
-      if (!response.ok) {
-        throw new Error(`Search failed with status ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`Search failed with status ${response.status}`);
+        }
+
+        const html = await response.text();
+        const results = this.parseSearchResults(html, input.limit);
+
+        ctx.logger.info(`   ╰─Found ${results.length} search results for query: ${query}`);
+        allResults.push(results);
+      } catch (error) {
+        ctx.logger.error({ err: error, query }, '   ╰─Web search failed');
+        throw error;
+      }
+    }
+
+    return allResults.flat();
+  }
+  /**
+ * Extracts search queries from a block of text containing an ordered or unordered list.
+ * Each list item is expected to contain a string in double quotes (e.g., "query here").
+ * The function returns only the content inside the quotes.
+ *
+ * Supports:
+ * - Ordered lists: 1., 2., etc.
+ * - Unordered lists: *, -, •, etc.
+ *
+ * @param text The input text containing the list
+ * @returns An array of extracted query strings
+ */
+private extractSearchQueries(text: string): string[] {
+  // Split the input into lines and remove leading/trailing whitespace
+  const lines: string[] = text.trim().split('\n');
+
+  const queries: string[] = lines
+    .map((line: string) => {
+      // Remove leading list markers (numbers with dot, bullets, etc.) and trim
+      let cleaned: string = line
+        .trim()
+        .replace(/^(\d+\.|\*\s*|\-\s*|•\s*)/, '')
+        .trim();
+
+      // Extract text inside double quotes
+      const match: RegExpMatchArray | null = cleaned.match(/"([^"]*)"/);
+      if (match) {
+        return match[1]; // Content inside the quotes
       }
 
-      const html = await response.text();
-      const results = this.parseSearchResults(html, input.limit);
+      // Fallback: return cleaned line if no quotes found
+      return cleaned;
+    })
+    .filter((query: string) => query.length > 0); // Remove empty entries
 
-      ctx.logger.info(`   ╰─Found ${results.length} search results`);
-      return results;
-    } catch (error) {
-      ctx.logger.error({ err: error }, '   ╰─Web search failed');
-      throw error;
-    }
-  }
-
+  return queries;
+}
   private parseSearchResults(html: string, limit: number): SearchResult[] {
     const results: SearchResult[] = [];
     
