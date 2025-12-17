@@ -674,6 +674,26 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/artifacts:
+    get:
+      tags:
+        - artifacts
+      summary: List all artifacts
+      description: Retrieve a list of all artifact filenames
+      operationId: listArtifacts
+      responses:
+        "200":
+          description: List of artifact filenames
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example: ["bangalore-times.md", "report.json", "data.csv"]
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /api/v1/artifacts/{filename}:
     get:
       tags:

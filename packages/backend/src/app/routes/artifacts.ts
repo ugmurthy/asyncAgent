@@ -1,12 +1,30 @@
 import { FastifyInstance } from 'fastify';
 import { resolve, join, basename } from 'path';
 import { existsSync } from 'fs';
-import { readFile } from 'fs/promises';
+import { readFile, readdir } from 'fs/promises';
 import { logger } from '../../util/logger.js';
 
 const ARTIFACTS_DIR = resolve('./artifacts');
 
 export const artifactsRoutes = async (fastify: FastifyInstance) => {
+  fastify.get('/artifacts', async (request, reply) => {
+    try {
+      if (!existsSync(ARTIFACTS_DIR)) {
+        return [];
+      }
+      
+      const files = await readdir(ARTIFACTS_DIR, { withFileTypes: true });
+      const filenames = files
+        .filter(file => file.isFile())
+        .map(file => file.name);
+      
+      return filenames;
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to list artifacts');
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   fastify.get('/artifacts/:filename', async (request, reply) => {
     const { filename } = request.params as { filename: string };
     

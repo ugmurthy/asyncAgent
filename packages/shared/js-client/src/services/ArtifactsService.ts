@@ -7,6 +7,21 @@ import type { BaseHttpRequest } from '../core/BaseHttpRequest.js';
 export class ArtifactsService {
     constructor(public readonly httpRequest: BaseHttpRequest) {}
     /**
+     * List all artifacts
+     * Retrieve a list of all artifact filenames
+     * @returns string List of artifact filenames
+     * @throws ApiError
+     */
+    public listArtifacts(): CancelablePromise<Array<string>> {
+        return this.httpRequest.request({
+            method: 'GET',
+            url: '/api/v1/artifacts',
+            errors: {
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
      * Get artifact content
      * Retrieve the content of a generated artifact file
      * @returns string Artifact content
