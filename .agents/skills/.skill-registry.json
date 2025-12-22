@@ -1,0 +1,10 @@
+{
+	"version": 1,
+	"skills": {
+		"pdf": {
+			"name": "pdf",
+			"source": "anthropics/skills/pdf",
+			"installedAt": 1766039166084
+		}
+	}
+}

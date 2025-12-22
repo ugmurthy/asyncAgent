@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, sqliteView, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 
@@ -167,6 +167,35 @@ export const subSteps = sqliteTable('sub_steps', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
+export const executions = sqliteView('executions').as((qb) => 
+  qb.select({
+    dagTitle: dags.dagTitle,
+    id: dagExecutions.id,
+    dagId: dagExecutions.dagId,
+    originalRequest: dagExecutions.originalRequest,
+    primaryIntent: dagExecutions.primaryIntent,
+    status: dagExecutions.status,
+    startedAt: dagExecutions.startedAt,
+    completedAt: dagExecutions.completedAt,
+    durationMs: dagExecutions.durationMs,
+    totalTasks: dagExecutions.totalTasks,
+    completedTasks: dagExecutions.completedTasks,
+    failedTasks: dagExecutions.failedTasks,
+    waitingTasks: dagExecutions.waitingTasks,
+    finalResult: dagExecutions.finalResult,
+    synthesisResult: dagExecutions.synthesisResult,
+    suspendedReason: dagExecutions.suspendedReason,
+    suspendedAt: dagExecutions.suspendedAt,
+    retryCount: dagExecutions.retryCount,
+    lastRetryAt: dagExecutions.lastRetryAt,
+    createdAt: dagExecutions.createdAt,
+    updatedAt: dagExecutions.updatedAt,
+  })
+  .from(dagExecutions)
+  .innerJoin(dags, sql`${dagExecutions.dagId} = ${dags.id}`)
+  .orderBy(sql`${dagExecutions.updatedAt} DESC`)
+);
+
 export type Goal = typeof goals.$inferSelect;
 export type NewGoal = typeof goals.$inferInsert;
 export type Schedule = typeof schedules.$inferSelect;
@@ -187,6 +216,7 @@ export type DagExecution = typeof dagExecutions.$inferSelect;
 export type NewDagExecution = typeof dagExecutions.$inferInsert;
 export type SubStep = typeof subSteps.$inferSelect;
 export type NewSubStep = typeof subSteps.$inferInsert;
+export type Execution = typeof executions.$inferSelect;
 
 // Relations
 export const goalsRelations = relations(goals, ({ one, many }) => ({

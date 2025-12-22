@@ -1,11 +1,28 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { goto } from '$app/navigation';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/ui/card';
 	import { Badge } from '$lib/ui/badge';
+	import * as Tabs from '$lib/ui/tabs';
+	import * as Table from '$lib/ui/table';
 	import StatsCard from '$lib/components/dashboard/StatsCard.svelte';
-	import { formatRelativeTime } from '$lib/utils/formatters';
+	import StatusBadge from '$lib/components/common/StatusBadge.svelte';
+	import { formatRelativeTime, formatDate } from '$lib/utils/formatters';
 	
 	export let data: PageData;
+
+	function getExecutionDuration(execution: any): string {
+		if (!execution.startedAt) return '-';
+		const end = execution.endedAt ? new Date(execution.endedAt) : new Date();
+		const start = new Date(execution.startedAt);
+		const durationMs = end.getTime() - start.getTime();
+		const seconds = Math.floor(durationMs / 1000);
+		if (seconds < 60) return `${seconds}s`;
+		const minutes = Math.floor(seconds / 60);
+		if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+		const hours = Math.floor(minutes / 60);
+		return `${hours}h ${minutes % 60}m`;
+	}
 </script>
 
 <svelte:head>
@@ -59,35 +76,93 @@
 
 			<section>
 				<h2 class="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
-				<Card>
-					<CardHeader>
-						<CardTitle>Latest Runs</CardTitle>
-					</CardHeader>
-					<CardContent>
-						{#if data.runs && data.runs.length > 0}
-							<div class="space-y-3">
-								{#each data.runs.slice(0, 5) as run}
-									<div class="flex items-center justify-between border-b border-gray-200 pb-2 last:border-0">
-										<div class="flex-1">
-											<p class="text-sm font-medium text-gray-900">Run {run.id.slice(0, 8)}</p>
-											<p class="text-xs text-gray-500">{formatRelativeTime(run.createdAt)}</p>
-										</div>
-										<Badge variant={
-											run.status === 'completed' ? 'default' : 
-											run.status === 'failed' ? 'destructive' : 
-											run.status === 'running' ? 'default' : 
-											'secondary'
-										}>
-											{run.status}
-										</Badge>
+				<Tabs.Root value="runs" class="w-full">
+					<Tabs.List class="grid w-full grid-cols-2">
+						<Tabs.Trigger value="runs">Latest Runs</Tabs.Trigger>
+						<Tabs.Trigger value="executions">Executions</Tabs.Trigger>
+					</Tabs.List>
+					
+					<Tabs.Content value="runs">
+						<Card>
+							<CardHeader>
+								<CardTitle>Latest Runs</CardTitle>
+							</CardHeader>
+							<CardContent>
+								{#if data.runs && data.runs.length > 0}
+									<div class="space-y-3">
+										{#each data.runs.slice(0, 5) as run}
+											<div class="flex items-center justify-between border-b border-gray-200 pb-2 last:border-0">
+												<div class="flex-1">
+													<p class="text-sm font-medium text-gray-900">Run {run.id.slice(0, 8)}</p>
+													<p class="text-xs text-gray-500">{formatRelativeTime(run.createdAt)}</p>
+												</div>
+												<Badge variant={
+													run.status === 'completed' ? 'default' : 
+													run.status === 'failed' ? 'destructive' : 
+													run.status === 'running' ? 'default' : 
+													'secondary'
+												}>
+													{run.status}
+												</Badge>
+											</div>
+										{/each}
 									</div>
-								{/each}
-							</div>
-						{:else}
-							<p class="text-sm text-gray-500">No runs yet</p>
-						{/if}
-					</CardContent>
-				</Card>
+								{:else}
+									<p class="text-sm text-gray-500">No runs yet</p>
+								{/if}
+							</CardContent>
+						</Card>
+					</Tabs.Content>
+
+					<Tabs.Content value="executions">
+						<Card>
+							<CardHeader>
+								<CardTitle>Executions</CardTitle>
+							</CardHeader>
+							<CardContent>
+								{#if data.executions && data.executions.length > 0}
+									<Table.Root>
+										<Table.Header>
+											<Table.Row>
+												<Table.Head>DAG Title</Table.Head>
+												<Table.Head>Status</Table.Head>
+												<Table.Head>Updated</Table.Head>
+												<Table.Head>Duration</Table.Head>
+												<Table.Head class="text-right">Steps</Table.Head>
+											</Table.Row>
+										</Table.Header>
+										<Table.Body>
+											{#each data.executions as execution}
+												<Table.Row 
+													class="cursor-pointer hover:bg-gray-50 transition-colors"
+													onclick={() => goto(`/dag-executions/${execution.id}`)}
+												>
+													<Table.Cell class="font-medium">
+														{execution.dagTitle || 'Untitled'}
+													</Table.Cell>
+													<Table.Cell>
+														<StatusBadge status={execution.status} />
+													</Table.Cell>
+													<Table.Cell class="text-sm text-gray-600">
+														{formatRelativeTime(execution.updatedAt || execution.createdAt)}
+													</Table.Cell>
+													<Table.Cell class="text-sm text-gray-600">
+														{getExecutionDuration(execution)}
+													</Table.Cell>
+													<Table.Cell class="text-right text-sm text-gray-600">
+														{execution.subSteps?.length || 0}
+													</Table.Cell>
+												</Table.Row>
+											{/each}
+										</Table.Body>
+									</Table.Root>
+								{:else}
+									<p class="text-sm text-gray-500">No executions yet</p>
+								{/if}
+							</CardContent>
+						</Card>
+					</Tabs.Content>
+				</Tabs.Root>
 			</section>
 
 			{#if data.health}

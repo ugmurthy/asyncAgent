@@ -33,6 +33,7 @@ export const NAV_ITEMS = [
 	{ name: 'Goals', path: '/goals', icon: 'target' },
 	{ name: 'Runs', path: '/runs', icon: 'play' },
 	{ name: 'DAGs', path: '/dags', icon: 'dag' },
+	{ name: 'Executions', path: '/dag-executions', icon: 'list' },
 	{ name: 'Art Feedback', path: '/art-feedback', icon: 'image' },
 	{ name: 'Settings', path: '/settings', icon: 'settings' }
 ] as const;

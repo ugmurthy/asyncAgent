@@ -4,18 +4,23 @@ import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params }) => {
 	try {
+		console.log('Loading DAG with ID:', params.id);
 		const dag = await apiClient.dag.getDag({ id: params.id });
-		const executionsList = await apiClient.dag.listDagExecutions({});
-		
-		// Filter executions for this DAG
-		const dagExecutions = executionsList.executions?.filter(e => e.dagId === params.id) || [];
+		console.log('DAG loaded successfully:', dag);
+		const executionsList = await apiClient.dag.getDagExecutions({ id: params.id });
 		
 		return { 
 			dag,
-			executions: dagExecutions
+			executions: executionsList.executions || []
 		};
-	} catch (err) {
+	} catch (err: any) {
 		console.error('Failed to load DAG:', err);
-		throw error(404, 'DAG not found');
+		console.error('Error details:', {
+			message: err.message,
+			status: err.status,
+			body: err.body,
+			url: err.url
+		});
+		throw error(404, `DAG not found: ${err.message || 'Unknown error'}`);
 	}
 };

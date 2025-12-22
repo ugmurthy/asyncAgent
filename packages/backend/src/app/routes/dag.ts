@@ -6,7 +6,7 @@ import { DAGExecutor, type DecomposerJob } from '../../agent/dagExecutor.js';
 import { LlmExecuteTool } from '../../agent/tools/llmExecute.js';
 import type { ToolRegistry } from '../../agent/tools/index.js';
 import { createLLMProvider } from '../../agent/providers/index.js';
-import { agents, dags, dagExecutions, subSteps } from '../../db/schema.js';
+import { agents, dags, dagExecutions, subSteps, executions } from '../../db/schema.js';
 import { eq, and, desc, sql, isNotNull } from 'drizzle-orm';
 import { dagEventBus, type DAGEvent } from '../../events/bus.js';
 import { validateCronExpression } from '../../utils/cron-validator.js';
@@ -1428,22 +1428,27 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
 
       const { id } = paramsSchema.parse(request.params);
 
-      const execution = await db.query.dagExecutions.findFirst({
-        where: eq(dagExecutions.id, id),
-        with: {
-          subSteps: {
-            orderBy: (subSteps, { asc }) => [asc(subSteps.taskId)],
-          },
-        },
-      });
+      const executionResult = await db.all(
+        sql`SELECT * FROM executions WHERE id = ${id} LIMIT 1`
+      );
 
-      if (!execution) {
+      if (!executionResult || executionResult.length === 0) {
         return reply.code(404).send({
           error: `DAG execution with id '${id}' not found`,
         });
       }
 
-      return reply.code(200).send(execution);
+      const execution = executionResult[0];
+
+      const subStepsList = await db.query.subSteps.findMany({
+        where: eq(subSteps.executionId, id),
+        orderBy: (subSteps, { asc }) => [asc(subSteps.taskId)],
+      });
+
+      return reply.code(200).send({
+        ...execution,
+        subSteps: subStepsList,
+      });
 
     } catch (error) {
       log.error({ err: error }, 'Failed to retrieve DAG execution');
@@ -1538,21 +1543,23 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
 
       const { limit, offset, status } = querySchema.parse(request.query);
 
-      const whereConditions = status ? eq(dagExecutions.status, status) : undefined;
-
-      const executions = await db.query.dagExecutions.findMany({
-        where: whereConditions,
-        orderBy: desc(dagExecutions.createdAt),
-        limit,
-        offset,
-      });
+      let executionsList;
+      if (status) {
+        executionsList = await db.all(
+          sql`SELECT * FROM executions WHERE status = ${status} LIMIT ${limit} OFFSET ${offset}`
+        );
+      } else {
+        executionsList = await db.all(
+          sql`SELECT * FROM executions LIMIT ${limit} OFFSET ${offset}`
+        );
+      }
 
       return reply.code(200).send({
-        executions,
+        executions: executionsList,
         pagination: {
           limit,
           offset,
-          count: executions.length,
+          count: executionsList.length,
         },
       });
 
@@ -1736,20 +1743,22 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
 
     const { id } = params;
 
-    const execution = await db.query.dagExecutions.findFirst({
-      where: eq(dagExecutions.id, id),
-      with: {
-        subSteps: {
-          orderBy: (subSteps, { asc }) => [asc(subSteps.taskId)],
-        },
-      },
-    });
+    const executionResult = await db.all(
+      sql`SELECT * FROM executions WHERE id = ${id} LIMIT 1`
+    );
 
-    if (!execution) {
+    if (!executionResult || executionResult.length === 0) {
       return reply.code(404).send({
         error: `DAG execution with id '${id}' not found`,
       });
     }
+
+    const execution = executionResult[0];
+
+    const subStepsList = await db.query.subSteps.findMany({
+      where: eq(subSteps.executionId, id),
+      orderBy: (subSteps, { asc }) => [asc(subSteps.taskId)],
+    });
 
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -1947,6 +1956,88 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
 
     } catch (error) {
       log.error({ err: error }, 'Failed to retrieve DAG');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * GET /dags/:id/executions - Get executions for a specific DAG
+   * 
+   * @param request.params.id - The DAG ID
+   * @param request.query.limit - Maximum number of results (default 50)
+   * @param request.query.offset - Number of results to skip (default 0)
+   * @param request.query.status - Filter by execution status
+   * 
+   * @returns {200} Success - List of executions for the DAG
+   * @returns {404} Not Found - DAG not found
+   * @returns {500} Server Error - Retrieval failed
+   */
+  fastify.get('/dags/:id/executions', async (request, reply) => {
+    try {
+      const paramsSchema = z.object({
+        id: z.string().min(1),
+      });
+
+      const querySchema = z.object({
+        limit: z.coerce.number().int().positive().default(50),
+        offset: z.coerce.number().int().nonnegative().default(0),
+        status: z.enum(['pending', 'running', 'waiting', 'completed', 'failed', 'partial', 'suspended']).optional(),
+      });
+
+      const { id } = paramsSchema.parse(request.params);
+      const { limit, offset, status } = querySchema.parse(request.query);
+
+      // Verify DAG exists
+      const dag = await db.query.dags.findFirst({
+        where: eq(dags.id, id),
+      });
+
+      if (!dag) {
+        return reply.code(404).send({
+          error: `DAG with id '${id}' not found`,
+        });
+      }
+
+      // Build query conditions
+      const conditions = [eq(dagExecutions.dagId, id)];
+      if (status) {
+        conditions.push(eq(dagExecutions.status, status));
+      }
+
+      // Fetch executions for this DAG
+      const executions = await db.query.dagExecutions.findMany({
+        where: and(...conditions),
+        limit,
+        offset,
+        orderBy: (dagExecutions, { desc }) => [desc(dagExecutions.createdAt)],
+      });
+
+      // Get total count for pagination
+      const allExecutions = await db.query.dagExecutions.findMany({
+        where: and(...conditions),
+      });
+
+      return reply.code(200).send({
+        executions,
+        total: allExecutions.length,
+        limit,
+        offset,
+      });
+
+    } catch (error) {
+      log.error({ err: error }, 'Failed to retrieve DAG executions');
       
       if (error instanceof z.ZodError) {
         return reply.code(400).send({

@@ -23,11 +23,17 @@
     taskId: string;
     description: string;
     thought: string;
-    actionType: 'tool' | 'inference';
+    actionType: "tool" | "inference";
     toolOrPromptName: string;
     toolOrPromptParams?: Record<string, any>;
     dependencies: string[];
-    status: 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'blocked';
+    status:
+      | "pending"
+      | "running"
+      | "waiting"
+      | "completed"
+      | "failed"
+      | "blocked";
     result?: any;
     error?: string;
     startedAt?: string;
@@ -38,9 +44,17 @@
   }
 
   interface LocalExecution {
+    dagTitle: string | null;
     id: string;
     dagId: string | null;
-    status: 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'partial' | 'suspended';
+    status:
+      | "pending"
+      | "running"
+      | "waiting"
+      | "completed"
+      | "failed"
+      | "partial"
+      | "suspended";
     completedTasks: number;
     failedTasks: number;
     waitingTasks: number;
@@ -73,13 +87,15 @@
   let lastProcessedResult = $state<any>(null);
   let events = $state<any[]>([]);
   let eventsContainer: HTMLDivElement | null = null;
-  
+
   // Modal state for step details
   let selectedStep = $state<LocalSubStep | null>(null);
   let showStepModal = $state(false);
 
   let lastStep = $derived(
-    subSteps.length > 0 ? subSteps.find(s => s.taskId === String(subSteps.length)) || null : null
+    subSteps.length > 0
+      ? subSteps.find((s) => s.taskId === String(subSteps.length)) || null
+      : null
   );
   $effect(() => {
     console.log("subSteps : ", subSteps);
@@ -283,9 +299,6 @@
         `${getApiBaseUrl()}/resume-dag/${execution.id}`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
         }
       );
 
@@ -312,12 +325,12 @@
         return "bg-gray-100 text-gray-800";
     }
   }
-  
+
   function openStepModal(step: LocalSubStep) {
     selectedStep = step;
     showStepModal = true;
   }
-  
+
   function closeStepModal() {
     showStepModal = false;
     selectedStep = null;
@@ -326,7 +339,7 @@
 
 <div class="container mx-auto py-8 px-4">
   <div class="mb-6">
-    <Button variant="ghost" onclick={() => goto(`/dags/${execution.dagId}`)}>
+    <Button variant="ghost" onclick={() => goto(`/dags/${execution.dag_id}`)}>
       ← Back to DAG
     </Button>
   </div>
@@ -370,26 +383,26 @@
               <p class="text-sm font-medium text-gray-500">DAG ID</p>
               <p class="text-sm">
                 <a
-                  href={`/dags/${execution.dagId}`}
+                  href={`/dags/${execution.dag_id}`}
                   class="text-blue-600 hover:underline"
                 >
-                  {execution.dagId}
+                  {execution.dag_id}
                 </a>
               </p>
             </div>
             <div>
               <p class="text-sm font-medium text-gray-500">Started At</p>
               <p class="text-sm">
-                {execution.startedAt
-                  ? formatDate(execution.startedAt)
+                {execution.started_at
+                  ? formatDate(execution.started_at)
                   : "Not started"}
               </p>
             </div>
             <div>
               <p class="text-sm font-medium text-gray-500">Completed At</p>
               <p class="text-sm">
-                {execution.completedAt
-                  ? formatDate(execution.completedAt)
+                {execution.completed_at
+                  ? formatDate(execution.completed_at)
                   : "Not completed"}
               </p>
             </div>
@@ -407,7 +420,7 @@
             <div
               class="text-sm whitespace-pre-wrap h-80 overflow-y-auto border rounded bg-gray-50 p-3"
             >
-              {execution.originalRequest}
+              {execution.original_request}
             </div>
           </div>
         </Card.Content>
@@ -535,7 +548,7 @@
                     <Table.Cell class="text-sm text-gray-600">
                       {#if step.description}
                         {step.description.substring(0, 50)}
-                        {step.description.length > 50 ? '...' : ''}
+                        {step.description.length > 50 ? "..." : ""}
                       {:else}
                         <span class="text-gray-400">-</span>
                       {/if}
@@ -543,7 +556,7 @@
                     <Table.Cell class="text-sm text-gray-600">
                       {#if step.thought}
                         {step.thought.substring(0, 50)}
-                        {step.thought.length > 50 ? '...' : ''}
+                        {step.thought.length > 50 ? "..." : ""}
                       {:else}
                         <span class="text-gray-400">-</span>
                       {/if}
@@ -561,134 +574,158 @@
         </Card.Content>
       </Card.Root>
     </Tabs.Content>
-    </Tabs.Root>
-    </div>
+  </Tabs.Root>
+</div>
 
-    <!-- Step Details Modal -->
-    {#if showStepModal && selectedStep}
-      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <Card.Root class="w-full max-w-4xl max-h-screen overflow-y-auto">
-     <Card.Header>
-       <div class="flex items-start justify-between">
-         <div>
-           <Card.Title>Step Details: {selectedStep.id}</Card.Title>
-           <Card.Description>
-             Tool/Prompt: {selectedStep.toolOrPromptName}
-           </Card.Description>
-         </div>
-         <button
-           onclick={closeStepModal}
-           class="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none"
-           aria-label="Close modal"
-         >
-           ×
-         </button>
-       </div>
-     </Card.Header>
-     <Card.Content class="space-y-4">
-       <!-- Metadata Row -->
-       <div class="grid grid-cols-5 gap-4 border-b pb-4">
-         <div>
-           <p class="text-xs font-semibold text-gray-500 uppercase">Status</p>
-           <Badge class={`${getStatusColor(selectedStep.status)} mt-2`}>
-             {selectedStep.status}
-           </Badge>
-         </div>
-         <div>
-           <p class="text-xs font-semibold text-gray-500 uppercase">Action Type</p>
-           <Badge variant="outline" class="mt-2">{selectedStep.actionType}</Badge>
-         </div>
-         <div>
-           <p class="text-xs font-semibold text-gray-500 uppercase">Duration</p>
-           <p class="text-sm mt-2">
-             {selectedStep.durationMs
-               ? `${selectedStep.durationMs}ms`
-               : "-"}
-           </p>
-         </div>
-         <div>
-           <p class="text-xs font-semibold text-gray-500 uppercase">Started At</p>
-           <p class="text-sm mt-2">
-             {selectedStep.startedAt
-               ? formatDate(selectedStep.startedAt)
-               : "-"}
-           </p>
-         </div>
-         <div>
-           <p class="text-xs font-semibold text-gray-500 uppercase">Completed At</p>
-           <p class="text-sm mt-2">
-             {selectedStep.completedAt
-               ? formatDate(selectedStep.completedAt)
-               : "-"}
-           </p>
-         </div>
-       </div>
+<!-- Step Details Modal -->
+{#if showStepModal && selectedStep}
+  <div
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+  >
+    <Card.Root class="w-full max-w-4xl max-h-screen overflow-y-auto">
+      <Card.Header>
+        <div class="flex items-start justify-between">
+          <div>
+            <Card.Title>Step Details: {selectedStep.id}</Card.Title>
+            <Card.Description>
+              Tool/Prompt: {selectedStep.toolOrPromptName}
+            </Card.Description>
+          </div>
+          <button
+            onclick={closeStepModal}
+            class="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none"
+            aria-label="Close modal"
+          >
+            ×
+          </button>
+        </div>
+      </Card.Header>
+      <Card.Content class="space-y-4">
+        <!-- Metadata Row -->
+        <div class="grid grid-cols-5 gap-4 border-b pb-4">
+          <div>
+            <p class="text-xs font-semibold text-gray-500 uppercase">Status</p>
+            <Badge class={`${getStatusColor(selectedStep.status)} mt-2`}>
+              {selectedStep.status}
+            </Badge>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-500 uppercase">
+              Action Type
+            </p>
+            <Badge variant="outline" class="mt-2"
+              >{selectedStep.actionType}</Badge
+            >
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-500 uppercase">
+              Duration
+            </p>
+            <p class="text-sm mt-2">
+              {selectedStep.durationMs ? `${selectedStep.durationMs}ms` : "-"}
+            </p>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-500 uppercase">
+              Started At
+            </p>
+            <p class="text-sm mt-2">
+              {selectedStep.startedAt
+                ? formatDate(selectedStep.startedAt)
+                : "-"}
+            </p>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-500 uppercase">
+              Completed At
+            </p>
+            <p class="text-sm mt-2">
+              {selectedStep.completedAt
+                ? formatDate(selectedStep.completedAt)
+                : "-"}
+            </p>
+          </div>
+        </div>
 
-       {#if selectedStep.description}
-         <div>
-           <p class="text-sm font-medium text-gray-500 mb-2">Description</p>
-           <div class="bg-gray-50 rounded p-3 border">
-             <p class="text-sm whitespace-pre-wrap">{selectedStep.description}</p>
-           </div>
-         </div>
-       {/if}
+        {#if selectedStep.description}
+          <div>
+            <p class="text-sm font-medium text-gray-500 mb-2">Description</p>
+            <div class="bg-gray-50 rounded p-3 border">
+              <p class="text-sm whitespace-pre-wrap">
+                {selectedStep.description}
+              </p>
+            </div>
+          </div>
+        {/if}
 
-       {#if selectedStep.thought}
-         <div>
-           <p class="text-sm font-medium text-gray-500 mb-2">Thought</p>
-           <div class="bg-gray-50 rounded p-3 border">
-             <p class="text-sm whitespace-pre-wrap">{selectedStep.thought}</p>
-           </div>
-         </div>
-       {/if}
+        {#if selectedStep.thought}
+          <div>
+            <p class="text-sm font-medium text-gray-500 mb-2">Thought</p>
+            <div class="bg-gray-50 rounded p-3 border">
+              <p class="text-sm whitespace-pre-wrap">{selectedStep.thought}</p>
+            </div>
+          </div>
+        {/if}
 
-       {#if selectedStep.dependencies && selectedStep.dependencies.length > 0}
-         <div>
-           <p class="text-sm font-medium text-gray-500">Dependencies</p>
-           <div class="flex flex-wrap gap-2 mt-2">
-             {#each selectedStep.dependencies as dep}
-               <Badge variant="outline">{dep}</Badge>
-             {/each}
-           </div>
-         </div>
-       {/if}
+        {#if selectedStep.dependencies && selectedStep.dependencies.length > 0}
+          <div>
+            <p class="text-sm font-medium text-gray-500">Dependencies</p>
+            <div class="flex flex-wrap gap-2 mt-2">
+              {#each selectedStep.dependencies as dep}
+                <Badge variant="outline">{dep}</Badge>
+              {/each}
+            </div>
+          </div>
+        {/if}
 
-       {#if selectedStep.toolOrPromptParams && Object.keys(selectedStep.toolOrPromptParams).length > 0}
-         <div>
-           <p class="text-sm font-medium text-gray-500 mb-2">Parameters</p>
-           <div class="bg-gray-50 rounded p-3 overflow-x-auto max-h-48 overflow-y-auto">
-             <pre class="text-xs"><code>{JSON.stringify(selectedStep.toolOrPromptParams, null, 2)}</code></pre>
-           </div>
-         </div>
-       {/if}
+        {#if selectedStep.toolOrPromptParams && Object.keys(selectedStep.toolOrPromptParams).length > 0}
+          <div>
+            <p class="text-sm font-medium text-gray-500 mb-2">Parameters</p>
+            <div
+              class="bg-gray-50 rounded p-3 overflow-x-auto max-h-48 overflow-y-auto"
+            >
+              <pre class="text-xs"><code
+                  >{JSON.stringify(
+                    selectedStep.toolOrPromptParams,
+                    null,
+                    2
+                  )}</code
+                ></pre>
+            </div>
+          </div>
+        {/if}
 
-       {#if selectedStep.result}
-         <div>
-           <p class="text-sm font-medium text-gray-500 mb-2">Result</p>
-           <div class="bg-gray-50 rounded p-3 overflow-x-auto max-h-48 overflow-y-auto">
-             {#if typeof selectedStep.result === "string"}
-               <MarkdownRenderer source={selectedStep.result} />
-             {:else}
-               <pre class="text-xs"><code>{JSON.stringify(selectedStep.result, null, 2)}</code></pre>
-             {/if}
-           </div>
-         </div>
-       {/if}
+        {#if selectedStep.result}
+          <div>
+            <p class="text-sm font-medium text-gray-500 mb-2">Result</p>
+            <div
+              class="bg-gray-50 rounded p-3 overflow-x-auto max-h-48 overflow-y-auto"
+            >
+              {#if typeof selectedStep.result === "string"}
+                <MarkdownRenderer source={selectedStep.result} />
+              {:else}
+                <pre class="text-xs"><code
+                    >{JSON.stringify(selectedStep.result, null, 2)}</code
+                  ></pre>
+              {/if}
+            </div>
+          </div>
+        {/if}
 
-       {#if selectedStep.error}
-         <div>
-           <p class="text-sm font-medium text-red-600 mb-2">Error</p>
-           <div class="bg-red-50 rounded p-3 border border-red-200">
-             <p class="text-sm text-red-700">{selectedStep.error}</p>
-           </div>
-         </div>
-       {/if}
-     </Card.Content>
-     <Card.Footer>
-       <Button onclick={closeStepModal} variant="outline" class="w-full">
-         Back to Steps
-       </Button>
-     </Card.Footer>
+        {#if selectedStep.error}
+          <div>
+            <p class="text-sm font-medium text-red-600 mb-2">Error</p>
+            <div class="bg-red-50 rounded p-3 border border-red-200">
+              <p class="text-sm text-red-700">{selectedStep.error}</p>
+            </div>
+          </div>
+        {/if}
+      </Card.Content>
+      <Card.Footer>
+        <Button onclick={closeStepModal} variant="outline" class="w-full">
+          Back to Steps
+        </Button>
+      </Card.Footer>
     </Card.Root>
-    </div>
-    {/if}
+  </div>
+{/if}

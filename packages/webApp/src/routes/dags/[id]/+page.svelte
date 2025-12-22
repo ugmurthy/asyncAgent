@@ -104,9 +104,8 @@
     try {
       await apiClient.dag.deleteDagExecution({ id: executionId });
       addNotification("Execution deleted", "success");
-      const executionsList = await apiClient.dag.listDagExecutions({});
-      data.executions =
-        executionsList.executions?.filter((e) => e.dagId === dag.id) || [];
+      const executionsList = await apiClient.dag.getDagExecutions({ id: dag.id });
+      data.executions = executionsList.executions || [];
     } catch (error) {
       addNotification("Failed to delete execution", "error");
     }

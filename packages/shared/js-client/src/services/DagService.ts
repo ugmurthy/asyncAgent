@@ -406,4 +406,51 @@ export class DagService {
             },
         });
     }
+    /**
+     * Get executions for a specific DAG
+     * Retrieve all executions for a specific DAG with optional filtering and pagination
+     * @returns DAGExecutionList List of executions for the DAG
+     * @throws ApiError
+     */
+    public getDagExecutions({
+        id,
+        limit = 50,
+        offset,
+        status,
+    }: {
+        /**
+         * The DAG ID
+         */
+        id: string,
+        /**
+         * Maximum number of results (default 50)
+         */
+        limit?: number,
+        /**
+         * Number of results to skip (default 0)
+         */
+        offset?: number,
+        /**
+         * Filter by execution status
+         */
+        status?: 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'partial' | 'suspended',
+    }): CancelablePromise<DAGExecutionList> {
+        return this.httpRequest.request({
+            method: 'GET',
+            url: '/api/v1/dags/{id}/executions',
+            path: {
+                'id': id,
+            },
+            query: {
+                'limit': limit,
+                'offset': offset,
+                'status': status,
+            },
+            errors: {
+                400: `Bad Request - validation error`,
+                404: `Resource not found`,
+                500: `Internal server error`,
+            },
+        });
+    }
 }
