@@ -1,4 +1,4 @@
-import type { LLMProvider, LLMCallParams, LLMResponse, ChatParams, ChatResponse } from '@async-agent/shared';
+import type { LLMProvider, LLMCallParams, LLMResponse, LLMResponseWithUsage, ChatParams, ChatResponse, UsageInfo } from '@async-agent/shared';
 import { logger } from '../../util/logger.js';
 
 const BASE_URL = 'https://openrouter.ai/api/v1';
@@ -93,11 +93,7 @@ function jsonParseSafe(s: string): any {
   }
 }
 
-function extractUsage(data: OpenAIChatCompletionResponse): {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-} | undefined {
+function extractUsage(data: OpenAIChatCompletionResponse): UsageInfo | undefined {
   if (!data.usage) return undefined;
   
   return {
@@ -105,6 +101,14 @@ function extractUsage(data: OpenAIChatCompletionResponse): {
     completionTokens: data.usage.completion_tokens,
     totalTokens: data.usage.total_tokens,
   };
+}
+
+function extractCostFromGenerationStats(generationStats: any): number | undefined {
+  const totalCost = generationStats?.data?.total_cost;
+  if (totalCost !== undefined && totalCost !== null) {
+    return typeof totalCost === 'number' ? totalCost : parseFloat(totalCost);
+  }
+  return undefined;
 }
 
 
@@ -263,14 +267,21 @@ export class OpenRouterFetchProvider implements LLMProvider {
       }
 
       const content = data.choices[0]?.message?.content || '';
-      return { content, usage, generation_stats };
+      const costUsd = extractCostFromGenerationStats(generation_stats);
+      
+      return { 
+        content, 
+        usage, 
+        costUsd,
+        generationStats: generation_stats?.data,
+      };
     } catch (error) {
       logger.error({ err: error }, 'OpenRouter chat call failed');
       throw error;
     }
   }
 
-  async callWithTools(params: LLMCallParams): Promise<LLMResponse> {
+  async callWithTools(params: LLMCallParams): Promise<LLMResponseWithUsage> {
     try {
       const requestBody: any = {
         model: this.model,
@@ -280,7 +291,6 @@ export class OpenRouterFetchProvider implements LLMProvider {
         max_tokens: params.maxTokens ?? this.defaultMaxTokens,
       };
 
-      // Add reasoning_effort if present in params.reasoning
       if (params.reasoning?.reasoning_effort) {
         requestBody.reasoning_effort = params.reasoning.reasoning_effort;
       }
@@ -304,9 +314,10 @@ export class OpenRouterFetchProvider implements LLMProvider {
       
       const usage = extractUsage(data);
       const generation_stats = await this.extractGenerationId(data);
+      const costUsd = extractCostFromGenerationStats(generation_stats);
       
       if (usage) {
-        logger.debug({ usage, generation_stats }, 'OpenRouter callWithTools response metadata');
+        logger.debug({ usage, generation_stats, costUsd }, 'OpenRouter callWithTools response metadata');
       }
 
       const choice = data.choices[0];
@@ -323,10 +334,13 @@ export class OpenRouterFetchProvider implements LLMProvider {
         arguments: jsonParseSafe(tc.function.arguments),
       }));
 
-      const result: LLMResponse = {
+      const result: LLMResponseWithUsage = {
         thought,
         toolCalls,
         finishReason: mapFinishReason(choice.finish_reason),
+        usage,
+        costUsd,
+        generationStats: generation_stats?.data,
       };
 
       logger.debug({ result }, 'OpenRouter callWithTools response');

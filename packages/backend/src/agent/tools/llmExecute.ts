@@ -34,6 +34,8 @@ interface LlmExecuteOutput {
     completionTokens?: number;
     totalTokens?: number;
   };
+  costUsd?: number;
+  generationStats?: Record<string, any>;
   finishReason?: string;
   reasoning?: string;
 }
@@ -191,18 +193,12 @@ export class LlmExecuteTool extends BaseTool<LlmExecuteInput, LlmExecuteOutput> 
       });
 
       ctx.logger.info('LLM execution completed');
-      // ctx.logger.info({
-      //   task: input.task,
-      //   contentLength: response.content.length,
-      // }, 'LLM execution completed');
 
       return {
         content: response.content,
-        usage: {
-          promptTokens: undefined,
-          completionTokens: undefined,
-          totalTokens: undefined,
-        },
+        usage: response.usage,
+        costUsd: response.costUsd,
+        generationStats: response.generationStats,
       };
     } catch (error) {
       ctx.logger.error({

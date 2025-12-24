@@ -1,5 +1,5 @@
 import { Ollama } from 'ollama';
-import type { LLMProvider, LLMCallParams, LLMResponse, ChatParams, ChatResponse } from '@async-agent/shared';
+import type { LLMProvider, LLMCallParams, LLMResponse, LLMResponseWithUsage, ChatParams, ChatResponse, UsageInfo } from '@async-agent/shared';
 import { validateOllamaModel } from './validator.js';
 import { logger } from '../../util/logger.js';
 
@@ -74,6 +74,19 @@ export class OllamaProvider implements LLMProvider {
     }
   }
 
+  private extractUsage(response: any): UsageInfo | undefined {
+    if (!response.prompt_eval_count && !response.eval_count) return undefined;
+    
+    const promptTokens = response.prompt_eval_count ?? 0;
+    const completionTokens = response.eval_count ?? 0;
+    
+    return {
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
+    };
+  }
+
   async chat(params: ChatParams): Promise<ChatResponse> {
     try {
       const response = await this.client.chat({
@@ -88,14 +101,20 @@ export class OllamaProvider implements LLMProvider {
         },
       });
 
-      return { content: response.message.content || '' };
+      const usage = this.extractUsage(response);
+      
+      if (usage) {
+        logger.debug({ usage }, 'Ollama chat response usage');
+      }
+
+      return { content: response.message.content || '', usage };
     } catch (error) {
       logger.error({ err: error }, 'Ollama chat call failed');
       throw error;
     }
   }
 
-  async callWithTools(params: LLMCallParams): Promise<LLMResponse> {
+  async callWithTools(params: LLMCallParams): Promise<LLMResponseWithUsage> {
     try {
       const response = await this.client.chat({
         model: this.model,
@@ -117,6 +136,12 @@ export class OllamaProvider implements LLMProvider {
         },
       });
 
+      const usage = this.extractUsage(response);
+      
+      if (usage) {
+        logger.debug({ usage }, 'Ollama callWithTools response usage');
+      }
+
       const toolCalls = response.message.tool_calls?.map(tc => ({
         id: `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         name: tc.function.name,
@@ -127,6 +152,7 @@ export class OllamaProvider implements LLMProvider {
         thought: response.message.content || '',
         toolCalls,
         finishReason: toolCalls && toolCalls.length > 0 ? 'tool_calls' : 'stop',
+        usage,
       };
     } catch (error) {
       logger.error({ err: error }, 'Ollama API call failed');

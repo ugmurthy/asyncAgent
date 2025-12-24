@@ -56,6 +56,17 @@ export interface GlobalContext {
   totalTasks: number;
 }
 
+export interface TaskExecutionResult {
+  content: any;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+  costUsd?: number;
+  generationStats?: Record<string, any>;
+}
+
 export class DAGExecutor {
   constructor(private config: DAGExecutorConfig) {
     this.config.logger.info({
@@ -502,7 +513,7 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
         return task.dependencies.every(dep => executedTasks.has(dep));
       };
 
-    const executeTask = async (task: SubTask): Promise<any> => {
+    const executeTask = async (task: SubTask): Promise<TaskExecutionResult> => {
       const taskStartTime = Date.now();
       logger.info({id:task.id,description:task.description},`Executing sub-task`);
       logger.info({tool_or_prompt:task.tool_or_prompt},`╰─task_or_prompt`)
@@ -525,14 +536,12 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
 
       if (task.action_type === 'tool' && task.tool_or_prompt.name !== 'inference') {
         const tool = toolRegistry.get(task.tool_or_prompt.name);
-        // @TODO : Validate sub-task 
         if (!tool) {
           throw new Error(`Tool not found: ${task.tool_or_prompt.name}`);
         }
 
         const params = task.tool_or_prompt.params || {};
         const { resolvedParams, singleDependency } = this.resolveDependencies(params, taskResults, logger,task.tool_or_prompt.name);
-        //logger.debug({params,resolvedParams,singleDependency},'╰─resolved')
         const validatedInput = tool.inputSchema.parse(singleDependency !== null ? singleDependency : resolvedParams);
 
         const result = await tool.execute(validatedInput, {
@@ -541,11 +550,9 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
           abortSignal: new AbortController().signal,
         });
 
-        return result;
+        return { content: result };
       } else if (task.action_type === 'inference' || task.tool_or_prompt.name === 'inference') {
         const fullPrompt = this.buildInferencePrompt(task, globalContext, taskResults);
-        //logger.info({fullPrompt},'fullPrompt');
-        // Get agent details using agentName from task
         const agentName = task.tool_or_prompt.name;
         const agent = await db.query.agents.findFirst({
           where: eq(agents.name, agentName),
@@ -556,9 +563,6 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
         }
 
         const llmExecuteTool = new LlmExecuteTool();
-        //if (!llmExecuteTool) {
-        //  logger.warn('llmExecute tool not found in registry');
-        //}
 
         const result = await llmExecuteTool.execute({
           provider: agent.provider as 'openai' | 'openrouter' | 'openrouter-fetch' | 'ollama',
@@ -572,7 +576,12 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
           abortSignal: new AbortController().signal,
         });
 
-        return result.content;
+        return {
+          content: result.content,
+          usage: result.usage,
+          costUsd: result.costUsd,
+          generationStats: result.generationStats,
+        };
       }
 
       throw new Error(`Unknown action type: ${task.action_type}`);
@@ -594,14 +603,13 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
         readyTasks.map(async (task) => {
           const taskStartTime = Date.now();
           try {
-            const result = await executeTask(task);
-            taskResults.set(task.id, result);
+            const execResult = await executeTask(task);
+            taskResults.set(task.id, execResult.content);
             executedTasks.add(task.id);
             
-            // Capture and serialize result immediately to avoid race conditions
-            const serializedResult = typeof result === 'string' 
-              ? result 
-              : JSON.stringify(result);
+            const serializedResult = typeof execResult.content === 'string' 
+              ? execResult.content 
+              : JSON.stringify(execResult.content);
             
             logger.debug({taskId: task.id, result: serializedResult},`╰─task ${task.id} result after executeTask():`)
             
@@ -611,6 +619,9 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
                 result: serializedResult,
                 completedAt: new Date(),
                 durationMs: Date.now() - taskStartTime,
+                usage: execResult.usage,
+                costUsd: execResult.costUsd?.toString(),
+                generationStats: execResult.generationStats,
               })
               .where(and(
                 eq(subSteps.taskId, task.id),
@@ -624,7 +635,7 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
               taskId: parseInt(task.id),
               timestamp: Date.now(),
               durationMs: Date.now() - taskStartTime,
-              result: typeof result === 'string' ? result : JSON.stringify(result),
+              result: serializedResult,
             });
             
             logger.info(`Task ${task.id} completed successfully`);
@@ -665,18 +676,23 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
       job.synthesis_plan,
       taskResults,
       llmProvider,
-      logger
+      logger,
+      execId,
+      db
     );
 
     logger.info('Synthesis completed, running validation');
 
-    const validatedResult = await this.validate(synthesisResult, logger);
+    const validatedResult = await this.validate(synthesisResult.content, logger);
 
     const allSubSteps = await db.query.subSteps.findMany({
       where: eq(subSteps.executionId, execId),
     });
 
     const statusData = this.deriveExecutionStatus(allSubSteps);
+
+    const totalUsage = this.aggregateUsage(allSubSteps);
+    const totalCostUsd = this.aggregateCost(allSubSteps);
 
     await db.update(dagExecutions)
       .set({
@@ -685,9 +701,11 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
         failedTasks: statusData.failedTasks,
         waitingTasks: statusData.waitingTasks,
         finalResult: validatedResult,
-        synthesisResult: synthesisResult,
+        synthesisResult: synthesisResult.content,
         completedAt: new Date(),
         durationMs: Date.now() - startTime,
+        totalUsage,
+        totalCostUsd: totalCostUsd?.toString(),
       })
       .where(eq(dagExecutions.id, execId));
 
@@ -777,8 +795,10 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
     plan: string,
     taskResults: Map<string, any>,
     llmProvider: LLMProvider,
-    logger: Logger
-  ): Promise<string> {
+    logger: Logger,
+    executionId: string,
+    db: Database
+  ): Promise<TaskExecutionResult> {
     const context = Array.from(taskResults.entries())
       .map(([taskId, result]) => {
         const resultStr = typeof result === 'string' 
@@ -795,6 +815,8 @@ ${context}
 
 Generate the final report in Markdown format as specified in the synthesis plan.`;
 
+    const startTime = Date.now();
+    
     const response = await llmProvider.chat({
       messages: [
         { 
@@ -806,7 +828,35 @@ Generate the final report in Markdown format as specified in the synthesis plan.
       temperature: 0.5,
     });
 
-    return response.content;
+    const synthesisSubStepId = generateId('sub-step');
+    await db.insert(subSteps).values({
+      id: synthesisSubStepId,
+      executionId,
+      taskId: '__SYNTHESIS__',
+      description: 'Final synthesis of all task results',
+      thought: 'Aggregating results into final output',
+      actionType: 'inference',
+      toolOrPromptName: '__synthesis__',
+      toolOrPromptParams: { taskCount: taskResults.size },
+      dependencies: Array.from(taskResults.keys()),
+      status: 'completed',
+      startedAt: new Date(startTime),
+      completedAt: new Date(),
+      durationMs: Date.now() - startTime,
+      usage: response.usage,
+      costUsd: response.costUsd?.toString(),
+      generationStats: response.generationStats,
+      result: response.content,
+    });
+
+    logger.debug({ synthesisSubStepId, usage: response.usage, costUsd: response.costUsd }, 'Synthesis sub-step created');
+
+    return {
+      content: response.content,
+      usage: response.usage,
+      costUsd: response.costUsd,
+      generationStats: response.generationStats,
+    };
   }
 
   private async validate(
@@ -815,5 +865,37 @@ Generate the final report in Markdown format as specified in the synthesis plan.
   ): Promise<string> {
     logger.info('Validation step (pass-through)');
     return output;
+  }
+
+  private aggregateUsage(allSubSteps: SubStep[]): { promptTokens: number; completionTokens: number; totalTokens: number } | null {
+    let hasUsage = false;
+    let promptTokens = 0;
+    let completionTokens = 0;
+    let totalTokens = 0;
+
+    for (const step of allSubSteps) {
+      if (step.usage) {
+        hasUsage = true;
+        promptTokens += step.usage.promptTokens ?? 0;
+        completionTokens += step.usage.completionTokens ?? 0;
+        totalTokens += step.usage.totalTokens ?? 0;
+      }
+    }
+
+    return hasUsage ? { promptTokens, completionTokens, totalTokens } : null;
+  }
+
+  private aggregateCost(allSubSteps: SubStep[]): number | null {
+    let totalCost = 0;
+    let hasCost = false;
+
+    for (const step of allSubSteps) {
+      if (step.costUsd) {
+        hasCost = true;
+        totalCost += parseFloat(step.costUsd);
+      }
+    }
+
+    return hasCost ? totalCost : null;
   }
 }

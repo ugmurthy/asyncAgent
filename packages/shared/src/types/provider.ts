@@ -44,8 +44,23 @@ export interface ChatParams {
   maxTokens?: number;
 }
 
+export interface UsageInfo {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 export interface ChatResponse {
   content: string;
+  usage?: UsageInfo;
+  costUsd?: number;
+  generationStats?: Record<string, any>;
+}
+
+export interface LLMResponseWithUsage extends LLMResponse {
+  usage?: UsageInfo;
+  costUsd?: number;
+  generationStats?: Record<string, any>;
 }
 
 export interface LLMProvider {

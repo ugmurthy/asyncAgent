@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { LLMProvider, LLMCallParams, LLMResponse, ChatParams, ChatResponse } from '@async-agent/shared';
+import type { LLMProvider, LLMCallParams, LLMResponse, LLMResponseWithUsage, ChatParams, ChatResponse, UsageInfo } from '@async-agent/shared';
 import { validateOpenAIModel } from './validator.js';
 import { logger } from '../../util/logger.js';
 
@@ -19,6 +19,15 @@ export class OpenAIProvider implements LLMProvider {
     return validateOpenAIModel(model);
   }
 
+  private extractUsage(response: OpenAI.Chat.Completions.ChatCompletion): UsageInfo | undefined {
+    if (!response.usage) return undefined;
+    return {
+      promptTokens: response.usage.prompt_tokens,
+      completionTokens: response.usage.completion_tokens,
+      totalTokens: response.usage.total_tokens,
+    };
+  }
+
   async chat(params: ChatParams): Promise<ChatResponse> {
     try {
       const response = await this.client.chat.completions.create({
@@ -29,14 +38,20 @@ export class OpenAIProvider implements LLMProvider {
       });
 
       const content = response.choices[0].message.content || '';
-      return { content };
+      const usage = this.extractUsage(response);
+      
+      if (usage) {
+        logger.debug({ usage }, 'OpenAI chat response usage');
+      }
+
+      return { content, usage };
     } catch (error) {
       logger.error({ err: error }, 'OpenAI chat call failed');
       throw error;
     }
   }
 
-  async callWithTools(params: LLMCallParams): Promise<LLMResponse> {
+  async callWithTools(params: LLMCallParams): Promise<LLMResponseWithUsage> {
     try {
       const response = await this.client.chat.completions.create({
         model: this.model,
@@ -44,11 +59,15 @@ export class OpenAIProvider implements LLMProvider {
         tools: params.tools as any,
         temperature: params.temperature ?? 0.7,
         max_tokens: params.maxTokens ?? this.defaultMaxTokens,
-
       });
 
       const choice = response.choices[0];
       const message = choice.message;
+      const usage = this.extractUsage(response);
+
+      if (usage) {
+        logger.debug({ usage }, 'OpenAI callWithTools response usage');
+      }
 
       const toolCalls = message.tool_calls?.map(tc => ({
         id: tc.id,
@@ -60,6 +79,7 @@ export class OpenAIProvider implements LLMProvider {
         thought: message.content || '',
         toolCalls,
         finishReason: this.mapFinishReason(choice.finish_reason),
+        usage,
       };
     } catch (error) {
       logger.error({ err: error }, 'OpenAI API call failed');

@@ -273,7 +273,19 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       let showGoalText = goalText.length>50?`${goalText.slice(0,50)}...`:goalText;
       let attempt = 0;
       const maxAttempts = 3;
-      //log.info({systemPrompt},'System Prompt')
+      
+      // Planning cost tracking
+      const planningAttempts: Array<{
+        attempt: number;
+        reason: 'initial' | 'retry_gaps' | 'retry_parse_error' | 'retry_validation' | 'title_master';
+        usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+        costUsd?: number | null;
+        errorMessage?: string;
+        generationStats?: Record<string, any>;
+      }> = [];
+      const planningUsageTotal = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+      let planningCostTotal = 0;
+      let retryReason: 'initial' | 'retry_gaps' | 'retry_parse_error' | 'retry_validation' = 'initial';
 
       while (attempt < maxAttempts) {
         attempt++;
@@ -290,6 +302,20 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
           ...(body.seed !== undefined && { seed: body.seed }),
         });
 
+        // Track this attempt's usage
+        const attemptUsage = response.usage;
+        const attemptCost = response.costUsd;
+        const attemptGenStats = response.generationStats;
+        
+        if (attemptUsage) {
+          planningUsageTotal.promptTokens += attemptUsage.promptTokens ?? 0;
+          planningUsageTotal.completionTokens += attemptUsage.completionTokens ?? 0;
+          planningUsageTotal.totalTokens += attemptUsage.totalTokens ?? 0;
+        }
+        if (attemptCost != null) {
+          planningCostTotal += attemptCost;
+        }
+
         const MAX_RESPONSE_SIZE = 100_000; // 100KB limit
         if (response.content.length > MAX_RESPONSE_SIZE) {
           log.error({ responseSize: response.content.length }, 'LLM response exceeds size limit');
@@ -300,10 +326,20 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         }
 
         let result;
-        //log.info({ response }, 'LLM response');
         try {
           result = extractCodeBlock(response.content);
         } catch (parseError) {
+          const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+          
+          planningAttempts.push({
+            attempt,
+            reason: retryReason,
+            usage: attemptUsage,
+            costUsd: attemptCost,
+            errorMessage,
+            generationStats: attemptGenStats,
+          });
+          
           log.error({ 
             err: parseError, 
             attempt,
@@ -317,13 +353,24 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
               responsePreview: response.content.slice(0, 500),
             });
           }
+          retryReason = 'retry_parse_error';
           continue;
         }
+        
         const usage = response?.usage ?? null;
-        const generation_stats = response?.generation_stats ?? null;
+        const generation_stats = response?.generationStats ?? null;
         const validatedResult = DecomposerJobSchema.safeParse(result);
         
         if (!validatedResult.success) {
+          planningAttempts.push({
+            attempt,
+            reason: retryReason,
+            usage: attemptUsage,
+            costUsd: attemptCost,
+            errorMessage: JSON.stringify(validatedResult.error.issues),
+            generationStats: attemptGenStats,
+          });
+          
           log.error({ 
             errors: validatedResult.error.issues,
             attempt 
@@ -337,8 +384,18 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
               result,
             });
           }
+          retryReason = 'retry_validation';
           continue;
         }
+
+        // Successful attempt
+        planningAttempts.push({
+          attempt,
+          reason: retryReason,
+          usage: attemptUsage,
+          costUsd: attemptCost,
+          generationStats: attemptGenStats,
+        });
 
         const dag = validatedResult.data;
 
@@ -378,13 +435,32 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
               
               dagTitle = llmResult.content;
               log.info({ dagTitle }, 'Generated DAG title from TitleMaster');
+              
+              // Track TitleMaster costs
+              planningAttempts.push({
+                attempt,
+                reason: 'title_master',
+                usage: llmResult.usage,
+                costUsd: llmResult.costUsd,
+                generationStats: llmResult.generationStats,
+              });
+              
+              if (llmResult.usage) {
+                planningUsageTotal.promptTokens += llmResult.usage.promptTokens ?? 0;
+                planningUsageTotal.completionTokens += llmResult.usage.completionTokens ?? 0;
+                planningUsageTotal.totalTokens += llmResult.usage.totalTokens ?? 0;
+              }
+              if (llmResult.costUsd != null) {
+                planningCostTotal += llmResult.costUsd;
+              }
             } else {
               log.warn('TitleMaster agent not found or inactive');
             }
           } catch (titleError) {
             log.error({ err: titleError }, 'Error calling TitleMaster');
           }
-          /// to ensure goalText is retained as is in dag
+          
+          // to ensure goalText is retained as is in dag
           dag.original_request=goalText;
           await db.insert(dags).values({
             id: dagId,
@@ -407,6 +483,10 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
               max_tokens: body.max_tokens ?? 10000,
               seed: body.seed,
             },
+            // Planning cost tracking fields
+            planningTotalUsage: planningUsageTotal,
+            planningTotalCostUsd: planningCostTotal.toString(),
+            planningAttempts,
           });
 
           log.info({ 
@@ -414,7 +494,8 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
             agentName, 
             goalText: showGoalText,
             cronSchedule: body.cronSchedule,
-            scheduleActive: scheduleActive 
+            scheduleActive: scheduleActive,
+            planningCost: planningCostTotal,
           }, 'DAG saved to database');
 
           // Register with scheduler if schedule is active
@@ -439,6 +520,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
           currentGoalText = `${goalText}\n\nEnsure following gaps are covered:\n${gapsText}`;
           
           log.info({ gaps: dag.validation.gaps, attempt }, 'Retrying with gaps addressed');
+          retryReason = 'retry_gaps';
           continue;
         }
 
@@ -2208,6 +2290,316 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
 
     } catch (error) {
       log.error({ err: error }, 'Failed to delete DAG');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * GET /dag-executions/:id/costs - Get cost breakdown for a specific execution
+   * 
+   * @param request.params.id - The execution ID
+   * 
+   * @returns {200} Success - Cost breakdown including planning and execution costs
+   * @returns {404} Not Found - Execution not found
+   * @returns {500} Server Error - Query failed
+   */
+  fastify.get('/dag-executions/:id/costs', async (request, reply) => {
+    try {
+      const paramsSchema = z.object({
+        id: z.string().min(1),
+      });
+
+      const { id } = paramsSchema.parse(request.params);
+
+      const execution = await db.query.dagExecutions.findFirst({
+        where: eq(dagExecutions.id, id),
+      });
+
+      if (!execution) {
+        return reply.code(404).send({
+          error: `DAG execution with id '${id}' not found`,
+        });
+      }
+
+      // Get planning costs from parent DAG
+      const dag = execution.dagId 
+        ? await db.query.dags.findFirst({ where: eq(dags.id, execution.dagId) })
+        : null;
+
+      // Get all sub-steps including synthesis
+      const allSubSteps = await db.query.subSteps.findMany({
+        where: eq(subSteps.executionId, id),
+      });
+
+      // Separate synthesis from regular steps
+      const synthesisStep = allSubSteps.find(s => s.toolOrPromptName === '__synthesis__');
+      const taskSteps = allSubSteps.filter(s => s.toolOrPromptName !== '__synthesis__');
+
+      const planningCost = parseFloat(dag?.planningTotalCostUsd ?? '0');
+      const executionCost = parseFloat(execution.totalCostUsd ?? '0');
+
+      return reply.code(200).send({
+        dagId: execution.dagId,
+        executionId: id,
+        planning: dag ? {
+          totalUsage: dag.planningTotalUsage,
+          totalCostUsd: dag.planningTotalCostUsd,
+          attempts: dag.planningAttempts,
+        } : null,
+        execution: {
+          totalUsage: execution.totalUsage,
+          totalCostUsd: execution.totalCostUsd,
+          subSteps: taskSteps.map(s => ({
+            id: s.id,
+            taskId: s.taskId,
+            actionType: s.actionType,
+            toolOrPromptName: s.toolOrPromptName,
+            usage: s.usage,
+            costUsd: s.costUsd,
+          })),
+          synthesis: synthesisStep ? {
+            usage: synthesisStep.usage,
+            costUsd: synthesisStep.costUsd,
+          } : null,
+        },
+        totals: {
+          planningCostUsd: dag?.planningTotalCostUsd ?? '0',
+          executionCostUsd: execution.totalCostUsd ?? '0',
+          grandTotalCostUsd: (planningCost + executionCost).toString(),
+        },
+      });
+
+    } catch (error) {
+      log.error({ err: error }, 'Failed to retrieve execution costs');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * GET /dags/:id/costs - Get total cost for a DAG (planning + all executions)
+   * 
+   * @param request.params.id - The DAG ID
+   * 
+   * @returns {200} Success - Total costs including planning and all executions
+   * @returns {404} Not Found - DAG not found
+   * @returns {500} Server Error - Query failed
+   */
+  fastify.get('/dags/:id/costs', async (request, reply) => {
+    try {
+      const paramsSchema = z.object({
+        id: z.string().min(1),
+      });
+
+      const { id } = paramsSchema.parse(request.params);
+
+      const dag = await db.query.dags.findFirst({
+        where: eq(dags.id, id),
+      });
+
+      if (!dag) {
+        return reply.code(404).send({
+          error: `DAG with id '${id}' not found`,
+        });
+      }
+
+      const allExecutions = await db.query.dagExecutions.findMany({
+        where: eq(dagExecutions.dagId, id),
+      });
+
+      const executionTotalCost = allExecutions.reduce(
+        (sum, e) => sum + parseFloat(e.totalCostUsd ?? '0'), 
+        0
+      );
+
+      const planningCost = parseFloat(dag.planningTotalCostUsd ?? '0');
+
+      return reply.code(200).send({
+        dagId: id,
+        planning: {
+          totalUsage: dag.planningTotalUsage,
+          totalCostUsd: dag.planningTotalCostUsd,
+          attempts: dag.planningAttempts,
+        },
+        executions: allExecutions.map(e => ({
+          executionId: e.id,
+          status: e.status,
+          totalCostUsd: e.totalCostUsd,
+          startedAt: e.startedAt,
+          completedAt: e.completedAt,
+        })),
+        totals: {
+          planningCostUsd: dag.planningTotalCostUsd ?? '0',
+          executionsCostUsd: executionTotalCost.toString(),
+          grandTotalCostUsd: (planningCost + executionTotalCost).toString(),
+        },
+      });
+
+    } catch (error) {
+      log.error({ err: error }, 'Failed to retrieve DAG costs');
+      
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({
+          error: 'Invalid parameters',
+          validation_errors: error.issues,
+        });
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      return reply.code(500).send({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
+   * GET /costs/summary - Get cost summary across all DAGs
+   * 
+   * @param request.query.from - Start date (ISO format or relative like 7d, 2w)
+   * @param request.query.to - End date (ISO format or relative)
+   * @param request.query.groupBy - Grouping (day, week, month) - default: day
+   * 
+   * @returns {200} Success - Cost summary grouped by date
+   * @returns {500} Server Error - Query failed
+   */
+  fastify.get('/costs/summary', async (request, reply) => {
+    try {
+      const querySchema = z.object({
+        from: z.string().optional(),
+        to: z.string().optional(),
+        groupBy: z.enum(['day', 'week', 'month']).default('day'),
+      });
+
+      const { from, to, groupBy } = querySchema.parse(request.query);
+
+      // Parse date range
+      const parseDate = (dateStr: string | undefined, defaultDate: Date): Date => {
+        if (!dateStr) return defaultDate;
+        
+        // Handle relative dates like "7d" or "2w"
+        const relativeMatch = dateStr.match(/^(\d+)([dwm])$/);
+        if (relativeMatch) {
+          const amount = parseInt(relativeMatch[1], 10);
+          const unit = relativeMatch[2];
+          const now = new Date();
+          switch (unit) {
+            case 'd': return new Date(now.getTime() - amount * 24 * 60 * 60 * 1000);
+            case 'w': return new Date(now.getTime() - amount * 7 * 24 * 60 * 60 * 1000);
+            case 'm': return new Date(now.getFullYear(), now.getMonth() - amount, now.getDate());
+          }
+        }
+        
+        return new Date(dateStr);
+      };
+
+      const fromDate = parseDate(from, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)); // Default: 30 days ago
+      const toDate = parseDate(to, new Date());
+
+      // Get all DAGs with planning costs
+      const allDags = await db.query.dags.findMany();
+      const allExecutions = await db.query.dagExecutions.findMany();
+
+      // Group by date
+      const costsByDate = new Map<string, { planningCostUsd: number; executionCostUsd: number }>();
+
+      const formatDate = (date: Date): string => {
+        switch (groupBy) {
+          case 'week': {
+            const d = new Date(date);
+            d.setDate(d.getDate() - d.getDay()); // Start of week
+            return d.toISOString().split('T')[0];
+          }
+          case 'month':
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          default:
+            return date.toISOString().split('T')[0];
+        }
+      };
+
+      // Aggregate planning costs
+      for (const dag of allDags) {
+        if (!dag.createdAt) continue;
+        const dagDate = new Date(dag.createdAt);
+        if (dagDate < fromDate || dagDate > toDate) continue;
+        
+        const dateKey = formatDate(dagDate);
+        const existing = costsByDate.get(dateKey) ?? { planningCostUsd: 0, executionCostUsd: 0 };
+        existing.planningCostUsd += parseFloat(dag.planningTotalCostUsd ?? '0');
+        costsByDate.set(dateKey, existing);
+      }
+
+      // Aggregate execution costs
+      for (const exec of allExecutions) {
+        if (!exec.completedAt) continue;
+        const execDate = new Date(exec.completedAt);
+        if (execDate < fromDate || execDate > toDate) continue;
+        
+        const dateKey = formatDate(execDate);
+        const existing = costsByDate.get(dateKey) ?? { planningCostUsd: 0, executionCostUsd: 0 };
+        existing.executionCostUsd += parseFloat(exec.totalCostUsd ?? '0');
+        costsByDate.set(dateKey, existing);
+      }
+
+      // Convert to sorted array
+      const summary = Array.from(costsByDate.entries())
+        .map(([date, costs]) => ({
+          date,
+          planningCostUsd: costs.planningCostUsd.toString(),
+          executionCostUsd: costs.executionCostUsd.toString(),
+          totalCostUsd: (costs.planningCostUsd + costs.executionCostUsd).toString(),
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // Calculate totals
+      const totals = summary.reduce(
+        (acc, day) => ({
+          planningCostUsd: acc.planningCostUsd + parseFloat(day.planningCostUsd),
+          executionCostUsd: acc.executionCostUsd + parseFloat(day.executionCostUsd),
+          totalCostUsd: acc.totalCostUsd + parseFloat(day.totalCostUsd),
+        }),
+        { planningCostUsd: 0, executionCostUsd: 0, totalCostUsd: 0 }
+      );
+
+      return reply.code(200).send({
+        dateRange: {
+          from: fromDate.toISOString(),
+          to: toDate.toISOString(),
+          groupBy,
+        },
+        summary,
+        totals: {
+          planningCostUsd: totals.planningCostUsd.toString(),
+          executionCostUsd: totals.executionCostUsd.toString(),
+          totalCostUsd: totals.totalCostUsd.toString(),
+        },
+      });
+
+    } catch (error) {
+      log.error({ err: error }, 'Failed to retrieve cost summary');
       
       if (error instanceof z.ZodError) {
         return reply.code(400).send({
