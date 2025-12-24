@@ -202,16 +202,16 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
          this.handleMultipleMatches(value, key, tool, taskResults, logger, resolvedParams);
       //}
       // experimental function to detect dependencies
-      const result=this.extractTaskNumbers(value);
-      if (result.length>0){
-        logger.info({result},'result');
-      } 
+      //const result=this.extractTaskNumbers(value);
+      //if (result.length>0){
+      //  logger.info({result},'result');
+      //} 
     }
 
     //logger.debug({ resolvedParams, singleDependency }, 'resolvedParams, singleDependency');
     return { resolvedParams, singleDependency };
   }
-
+// this function is not longer used but a good one for extracting task #'s
   private  extractTaskNumbers(text:string) {
     const results = [];
 
@@ -523,7 +523,7 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
         description: task.description,
       });
 
-      if (task.action_type === 'tool') {
+      if (task.action_type === 'tool' && task.tool_or_prompt.name !== 'inference') {
         const tool = toolRegistry.get(task.tool_or_prompt.name);
         // @TODO : Validate sub-task 
         if (!tool) {
@@ -542,7 +542,7 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
         });
 
         return result;
-      } else if (task.action_type === 'inference') {
+      } else if (task.action_type === 'inference' || task.tool_or_prompt.name === 'inference') {
         const fullPrompt = this.buildInferencePrompt(task, globalContext, taskResults);
         //logger.info({fullPrompt},'fullPrompt');
         // Get agent details using agentName from task

@@ -5,57 +5,8 @@
     {
       "idx": 0,
       "version": "5",
-      "when": 1762151014819,
-      "tag": "0000_wet_luckman",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1762349889852,
-      "tag": "0001_large_boomerang",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1763119370986,
-      "tag": "0002_wealthy_krista_starr",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1763303539689,
-      "tag": "0003_sour_greymalkin",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "5",
-      "when": 1763370278209,
-      "tag": "0004_rich_guardian",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "5",
-      "when": 1763378227027,
-      "tag": "0005_zippy_preak",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "5",
-      "when": 1732722000000,
-      "tag": "0006_add_suspended_state",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "5",
-      "when": 1732722100000,
-      "tag": "0007_add_timezone_to_dags",
+      "when": 1766493236397,
+      "tag": "0000_gorgeous_black_queen",
       "breakpoints": true
     }
   ]

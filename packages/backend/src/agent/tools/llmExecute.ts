@@ -190,10 +190,11 @@ export class LlmExecuteTool extends BaseTool<LlmExecuteInput, LlmExecuteOutput> 
         maxTokens,
       });
 
-      ctx.logger.info({
-        task: input.task,
-        contentLength: response.content.length,
-      }, 'LLM execution completed');
+      ctx.logger.info('LLM execution completed');
+      // ctx.logger.info({
+      //   task: input.task,
+      //   contentLength: response.content.length,
+      // }, 'LLM execution completed');
 
       return {
         content: response.content,

@@ -1,0 +1,41 @@
+CREATE TABLE `dag_executions` (
+	`id` text PRIMARY KEY NOT NULL,
+	`dag_id` text,
+	`original_request` text NOT NULL,
+	`primary_intent` text NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`started_at` integer,
+	`completed_at` integer,
+	`duration_ms` integer,
+	`total_tasks` integer NOT NULL,
+	`completed_tasks` integer DEFAULT 0 NOT NULL,
+	`failed_tasks` integer DEFAULT 0 NOT NULL,
+	`waiting_tasks` integer DEFAULT 0 NOT NULL,
+	`final_result` text,
+	`synthesis_result` text,
+	`error` text,
+	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
+	FOREIGN KEY (`dag_id`) REFERENCES `dags`(`id`) ON UPDATE no action ON DELETE set null
+);
+--> statement-breakpoint
+CREATE TABLE `sub_steps` (
+	`id` text PRIMARY KEY NOT NULL,
+	`execution_id` text NOT NULL,
+	`task_id` text NOT NULL,
+	`description` text NOT NULL,
+	`thought` text NOT NULL,
+	`action_type` text NOT NULL,
+	`tool_or_prompt_name` text NOT NULL,
+	`tool_or_prompt_params` text,
+	`dependencies` text NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`started_at` integer,
+	`completed_at` integer,
+	`duration_ms` integer,
+	`result` text,
+	`error` text,
+	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
+	FOREIGN KEY (`execution_id`) REFERENCES `dag_executions`(`id`) ON UPDATE no action ON DELETE cascade
+);

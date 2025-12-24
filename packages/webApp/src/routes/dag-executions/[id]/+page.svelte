@@ -529,7 +529,7 @@
             <Table.Root>
               <Table.Header>
                 <Table.Row>
-                  <Table.Head class="text-left">Task</Table.Head>
+                  <Table.Head class="text-left">Task(Tool) deps</Table.Head>
                   <Table.Head class="text-left">Description</Table.Head>
                   <Table.Head class="text-left">Thought</Table.Head>
                   <Table.Head>Status</Table.Head>
@@ -543,7 +543,7 @@
                   >
                     <Table.Cell class="font-mono text-sm">
                       {step.taskId}
-                      ({step.toolOrPromptName})
+                      ({step.toolOrPromptName}) {step.dependencies}
                     </Table.Cell>
                     <Table.Cell class="text-sm text-gray-600">
                       {#if step.description}

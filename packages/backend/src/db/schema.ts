@@ -102,6 +102,28 @@ export const dags = sqliteTable('dags', {
   timezone: text('timezone').notNull().default('UTC'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  
+  // Planning cost tracking (aggregate over ALL attempts + TitleMaster)
+  planningTotalUsage: text('planning_total_usage', { mode: 'json' }).$type<{
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  }>(),
+  planningTotalCostUsd: text('planning_total_cost_usd'),
+  
+  // Per-attempt details for debugging/audit (including failed attempts)
+  planningAttempts: text('planning_attempts', { mode: 'json' }).$type<Array<{
+    attempt: number;
+    reason: 'initial' | 'retry_gaps' | 'retry_parse_error' | 'retry_validation' | 'title_master';
+    usage?: {
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    };
+    costUsd?: number | null;
+    errorMessage?: string;
+    generationStats?: Record<string, any>;
+  }>>(),
 });
 
 export const dagExecutions = sqliteTable('dag_executions', {
@@ -133,6 +155,14 @@ export const dagExecutions = sqliteTable('dag_executions', {
   retryCount: integer('retry_count').notNull().default(0),
   lastRetryAt: integer('last_retry_at', { mode: 'timestamp' }),
   
+  // Execution cost tracking (aggregate of all sub-steps including synthesis)
+  totalUsage: text('total_usage', { mode: 'json' }).$type<{
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  }>(),
+  totalCostUsd: text('total_cost_usd'),
+  
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
@@ -162,6 +192,15 @@ export const subSteps = sqliteTable('sub_steps', {
   
   result: text('result', { mode: 'json' }).$type<any>(),
   error: text('error'),
+  
+  // Sub-step cost tracking
+  usage: text('usage', { mode: 'json' }).$type<{
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  }>(),
+  costUsd: text('cost_usd'),
+  generationStats: text('generation_stats', { mode: 'json' }).$type<Record<string, any>>(),
   
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
