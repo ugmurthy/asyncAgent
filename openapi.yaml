@@ -1168,6 +1168,107 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/dag-run:
+    post:
+      tags:
+        - dag
+      summary: Run a previously created DAG
+      description: Retrieve a DAG by ID and forward it to execute-dag for execution
+      operationId: runDag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - dagId
+              properties:
+                dagId:
+                  type: string
+                  description: The ID of the DAG to retrieve and execute
+              additionalProperties: false
+      responses:
+        "200":
+          description: DAG execution response (forwarded from execute-dag)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecuteDAGResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/dag-experiments:
+    post:
+      tags:
+        - dag
+      summary: Run DAG experiments across multiple models and temperatures
+      description: |
+        Create multiple DAGs by testing different model and temperature combinations.
+        Useful for comparing LLM outputs across different configurations.
+      operationId: runDagExperiments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - goal-text
+                - models
+                - agentName
+                - provider
+                - temperatures
+              properties:
+                goal-text:
+                  type: string
+                  minLength: 1
+                  description: The goal text to decompose into a DAG
+                models:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  description: List of model names to test
+                  example: ["gpt-4o", "gpt-4o-mini"]
+                agentName:
+                  type: string
+                  minLength: 1
+                  description: Name of the agent to use
+                provider:
+                  type: string
+                  description: LLM provider to use
+                  example: openai
+                temperatures:
+                  type: array
+                  items:
+                    type: number
+                    minimum: 0
+                    maximum: 2
+                  minItems: 1
+                  description: List of temperature values to test
+                  example: [0.3, 0.7, 1.0]
+                seed:
+                  type: integer
+                  nullable: true
+                  description: Optional seed for reproducibility
+              additionalProperties: false
+      responses:
+        "200":
+          description: Experiment results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DAGExperimentsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /api/v1/dags/{id}/executions:
     get:
       tags:
@@ -2182,6 +2283,10 @@ components:
           type: boolean
           description: Whether the cron schedule is active
           default: false
+        planningTotalCostUsd:
+          type: string
+          nullable: true
+          description: Total cost in USD for all planning attempts including TitleMaster
         createdAt:
           type: string
           format: date-time
@@ -2338,6 +2443,10 @@ components:
           type: string
           format: date-time
           nullable: true
+        totalCostUsd:
+          type: string
+          nullable: true
+          description: Total cost in USD for the entire execution including all sub-steps and synthesis
         createdAt:
           type: string
           format: date-time
@@ -2388,6 +2497,10 @@ components:
         durationMs:
           type: integer
           nullable: true
+        costUsd:
+          type: string
+          nullable: true
+          description: Cost in USD for this sub-step
         createdAt:
           type: string
           format: date-time
@@ -2453,6 +2566,53 @@ components:
           properties:
             relatedSubStepsDeleted:
               type: integer
+
+    DAGExperimentsResponse:
+      type: object
+      required:
+        - status
+        - totalExperiments
+        - successCount
+        - failureCount
+        - results
+      properties:
+        status:
+          type: string
+          enum: [completed]
+        totalExperiments:
+          type: integer
+          description: Total number of experiments run
+        successCount:
+          type: integer
+          description: Number of successful DAG creations
+        failureCount:
+          type: integer
+          description: Number of failed DAG creations
+        results:
+          type: array
+          items:
+            type: object
+            required:
+              - model
+              - temperature
+              - success
+            properties:
+              model:
+                type: string
+                description: The model used for this experiment
+              temperature:
+                type: number
+                description: The temperature used for this experiment
+              dagId:
+                type: string
+                nullable: true
+                description: The created DAG ID if successful
+              success:
+                type: boolean
+                description: Whether the DAG creation was successful
+              error:
+                type: string
+                description: Error message if creation failed
 
     CreateGoalRequest:
       type: object

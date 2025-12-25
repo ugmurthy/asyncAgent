@@ -10,6 +10,7 @@ import type { CreateDAGResponse } from '../models/CreateDAGResponse.js';
 import type { DAG } from '../models/DAG.js';
 import type { DAGExecutionList } from '../models/DAGExecutionList.js';
 import type { DAGExecutionWithSteps } from '../models/DAGExecutionWithSteps.js';
+import type { DAGExperimentsResponse } from '../models/DAGExperimentsResponse.js';
 import type { DAGList } from '../models/DAGList.js';
 import type { DAGSubStepsList } from '../models/DAGSubStepsList.js';
 import type { DeleteDAGExecutionResponse } from '../models/DeleteDAGExecutionResponse.js';
@@ -402,6 +403,83 @@ export class DagService {
             errors: {
                 404: `Resource not found`,
                 409: `Conflict - DAG has existing executions`,
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
+     * Run a previously created DAG
+     * Retrieve a DAG by ID and forward it to execute-dag for execution
+     * @returns ExecuteDAGResponse DAG execution response (forwarded from execute-dag)
+     * @throws ApiError
+     */
+    public runDag({
+        requestBody,
+    }: {
+        requestBody: {
+            /**
+             * The ID of the DAG to retrieve and execute
+             */
+            dagId: string;
+        },
+    }): CancelablePromise<ExecuteDAGResponse> {
+        return this.httpRequest.request({
+            method: 'POST',
+            url: '/api/v1/dag-run',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Bad Request - validation error`,
+                404: `Resource not found`,
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
+     * Run DAG experiments across multiple models and temperatures
+     * Create multiple DAGs by testing different model and temperature combinations.
+     * Useful for comparing LLM outputs across different configurations.
+     *
+     * @returns DAGExperimentsResponse Experiment results
+     * @throws ApiError
+     */
+    public runDagExperiments({
+        requestBody,
+    }: {
+        requestBody: {
+            /**
+             * The goal text to decompose into a DAG
+             */
+            'goal-text': string;
+            /**
+             * List of model names to test
+             */
+            models: Array<string>;
+            /**
+             * Name of the agent to use
+             */
+            agentName: string;
+            /**
+             * LLM provider to use
+             */
+            provider: string;
+            /**
+             * List of temperature values to test
+             */
+            temperatures: Array<number>;
+            /**
+             * Optional seed for reproducibility
+             */
+            seed?: number | null;
+        },
+    }): CancelablePromise<DAGExperimentsResponse> {
+        return this.httpRequest.request({
+            method: 'POST',
+            url: '/api/v1/dag-experiments',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Bad Request - validation error`,
                 500: `Internal server error`,
             },
         });

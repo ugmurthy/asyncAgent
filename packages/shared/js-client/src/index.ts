@@ -23,6 +23,7 @@ export type { DAG } from './models/DAG.js';
 export type { DAGExecution } from './models/DAGExecution.js';
 export type { DAGExecutionList } from './models/DAGExecutionList.js';
 export type { DAGExecutionWithSteps } from './models/DAGExecutionWithSteps.js';
+export type { DAGExperimentsResponse } from './models/DAGExperimentsResponse.js';
 export type { DAGList } from './models/DAGList.js';
 export type { DAGSubStepsList } from './models/DAGSubStepsList.js';
 export type { DecomposerJob } from './models/DecomposerJob.js';

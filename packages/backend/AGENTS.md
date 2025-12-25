@@ -162,35 +162,43 @@ Base URL: `http://localhost:3000/api/v1`
 - `PATCH /api/v1/goals/:id` - Update goal properties
 - `DELETE /api/v1/goals/:id` - Delete goal and associated data
 - `POST /api/v1/goals/:id/run` - Manually trigger goal execution
+- `POST /api/v1/goals/:id/pause` - Pause a goal and deactivate its schedules
+- `POST /api/v1/goals/:id/resume` - Resume a paused goal
 
 ### Runs Management
 
-- `GET /api/v1/runs` - List all runs (optional `?status=` filter)
+- `GET /api/v1/runs` - List all runs (optional `?status=` and `?goalId=` filters)
 - `GET /api/v1/runs/:id` - Get run details
 - `GET /api/v1/runs/:id/steps` - Get execution steps for a run
 - `DELETE /api/v1/runs/:id` - Delete a run
 
 ### Agents
 
-- `GET /api/v1/agents` - List all agents
+- `GET /api/v1/agents` - List all agents (optional `?name=` and `?active=` filters)
 - `POST /api/v1/agents` - Create a new agent
 - `GET /api/v1/agents/:id` - Get agent details
 - `PATCH /api/v1/agents/:id` - Update agent
-- `DELETE /api/v1/agents/:id` - Delete agent
+- `DELETE /api/v1/agents/:id` - Delete agent (cannot delete active agents)
+- `POST /api/v1/agents/:id/activate` - Activate an agent version
+- `GET /api/v1/agents/resolve/:name` - Get the active agent for a given name
 
 ### Tools
 
-- `GET /api/v1/tools` - List all available tools
-- `GET /api/v1/tools/:name` - Get tool definition
+- `GET /api/v1/tools` - List all available tools (optional `?name=` to get specific tool)
 
 ### DAG Operations
 
 - `POST /api/v1/create-dag` - Create a DAG from goal text
 - `POST /api/v1/execute-dag` - Execute a previously created DAG
+- `POST /api/v1/create-and-execute-dag` - Create and immediately execute a DAG
 - `POST /api/v1/resume-dag/:executionId` - Resume a suspended or failed DAG execution
-- `GET /api/v1/dags` - List all DAGs with optional status filtering
+- `POST /api/v1/dag-run` - Run a previously created DAG by dagId
+- `POST /api/v1/dag-experiments` - Run DAG experiments across multiple models/temperatures
+- `GET /api/v1/dags` - List all DAGs with optional status filtering and pagination
+- `GET /api/v1/dags/scheduled` - List all DAGs with cron schedules
 - `GET /api/v1/dags/:id` - Get DAG by ID
-- `PATCH /api/v1/dags/:id` - Update DAG (status, result, or params)
+- `GET /api/v1/dags/:id/executions` - Get all executions for a specific DAG
+- `PATCH /api/v1/dags/:id` - Update DAG (status, result, params, schedule)
 - `DELETE /api/v1/dags/:id` - Delete a DAG (only if no executions exist)
 - `GET /api/v1/dag-executions` - List DAG executions with optional filtering
 - `GET /api/v1/dag-executions/:id` - Get DAG execution details with sub-steps
@@ -200,11 +208,12 @@ Base URL: `http://localhost:3000/api/v1`
 
 ### Task Execution
 
-- `POST /api/v1/task` - Execute a task with an agent and optional file attachments
+- `POST /api/v1/task` - Execute a task with an agent and optional file attachments (multipart)
 
 ### Artifacts
 
-- `GET /artifacts/:filename` - Retrieve a specific artifact file
+- `GET /api/v1/artifacts` - List all artifact filenames
+- `GET /api/v1/artifacts/:filename` - Retrieve a specific artifact file
 
 See [../../openapi.yaml](../../openapi.yaml) for complete API specification.
 

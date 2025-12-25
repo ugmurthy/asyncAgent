@@ -10,6 +10,10 @@ export type SubStepRecord = {
     result?: Record<string, any> | null;
     error?: string | null;
     durationMs?: number | null;
+    /**
+     * Cost in USD for this sub-step
+     */
+    costUsd?: string | null;
     createdAt: string;
     updatedAt?: string | null;
 };

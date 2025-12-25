@@ -47,6 +47,10 @@ export type DAG = {
      * Whether the cron schedule is active
      */
     scheduleActive?: boolean;
+    /**
+     * Total cost in USD for all planning attempts including TitleMaster
+     */
+    planningTotalCostUsd?: string | null;
     createdAt: string;
     updatedAt: string;
 };

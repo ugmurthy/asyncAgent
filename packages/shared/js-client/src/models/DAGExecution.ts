@@ -46,6 +46,10 @@ export type DAGExecution = {
     suspendedAt?: string | null;
     retryCount: number;
     lastRetryAt?: string | null;
+    /**
+     * Total cost in USD for the entire execution including all sub-steps and synthesis
+     */
+    totalCostUsd?: string | null;
     createdAt: string;
     updatedAt?: string | null;
 };
