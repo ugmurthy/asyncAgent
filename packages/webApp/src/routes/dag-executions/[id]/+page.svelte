@@ -10,6 +10,7 @@
   import EmptyState from "$lib/components/common/EmptyState.svelte";
   import MermaidDiagram from "$lib/components/dag/MermaidDiagram.svelte";
   import MarkdownRenderer from "$lib/components/common/MarkdownRenderer.svelte";
+  import MarkdownWithPdfExport from "$lib/components/common/MarkdownWithPdfExport.svelte";
   import { generateExecutionMermaid } from "$lib/utils/mermaid";
   import { formatDate, formatRelativeTime } from "$lib/utils/formatters";
   import { apiClient, getApiBaseUrl } from "$lib/api/client";
@@ -92,20 +93,18 @@
   let selectedStep = $state<LocalSubStep | null>(null);
   let showStepModal = $state(false);
 
-  let lastStep = $derived(
-    subSteps.length > 0
-      ? subSteps.find((s) => s.taskId === String(subSteps.length)) || null
-      : null
+  let synthesisStep = $derived(
+    subSteps.find((s) => s.taskId === "__SYNTHESIS__") || null
   );
   $effect(() => {
     console.log("subSteps : ", subSteps);
     if (
-      lastStep &&
-      lastStep.status === "completed" &&
-      lastStep.result !== lastProcessedResult
+      synthesisStep &&
+      synthesisStep.status === "completed" &&
+      synthesisStep.result !== lastProcessedResult
     ) {
-      lastProcessedResult = lastStep.result;
-      fetchResultContent(lastStep.result);
+      lastProcessedResult = synthesisStep.result;
+      fetchResultContent(synthesisStep.result);
     }
   });
 
@@ -439,11 +438,10 @@
               <span class="loading loading-spinner loading-md">Loading...</span>
             </div>
           {:else if markdownContent}
-            <div
-              class="prose max-w-none dark:prose-invert p-4 bg-gray-50 rounded-lg border"
-            >
-              <MarkdownRenderer source={markdownContent} />
-            </div>
+            <MarkdownWithPdfExport
+              source={markdownContent}
+              filename="execution-{execution.id}.pdf"
+            />
           {:else}
             <p class="text-gray-500 italic">No results available.</p>
           {/if}

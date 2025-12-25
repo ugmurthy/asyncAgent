@@ -290,7 +290,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
       while (attempt < maxAttempts) {
         attempt++;
         log.info({ attempt, agentName, goalText: showGoalText }, 'Creating DAG with LLM inference');
-        log.info({ model: activeLLMProvider.model, provider: activeLLMProvider.provider }, 'LLM Provider Configuration');
+        log.info({ model: activeLLMProvider.model, provider: activeLLMProvider.name }, 'LLM Provider Configuration');
         
         const response = await activeLLMProvider.chat ({
           messages: [
@@ -326,6 +326,7 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
         }
 
         let result;
+        log.info({ response: response.content }, 'LLM Response');
         try {
           result = extractCodeBlock(response.content);
         } catch (parseError) {
