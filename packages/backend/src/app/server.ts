@@ -28,7 +28,7 @@ fastify.decorate('db', db);
 
 // Register plugins
 await fastify.register(cors, {
-  origin: ['https://local.drizzle.studio','http://localhost:5174','http://localhost:5173','null'],
+  origin: ['https://local.drizzle.studio','http://localhost:5174','http://localhost:5173','http://100.100.172.104:5173','http://100.74.33.17:5173','null'],
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,

@@ -7,9 +7,13 @@
 	import * as Table from '$lib/ui/table';
 	import StatsCard from '$lib/components/dashboard/StatsCard.svelte';
 	import StatusBadge from '$lib/components/common/StatusBadge.svelte';
-	import { formatRelativeTime, formatDate } from '$lib/utils/formatters';
-	
-	export let data: PageData;
+	import { formatRelativeTime } from '$lib/utils/formatters';
+
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	function getExecutionDuration(execution: any): string {
 		if (!execution.startedAt) return '-';

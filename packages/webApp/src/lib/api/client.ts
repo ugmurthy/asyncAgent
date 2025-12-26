@@ -1,5 +1,9 @@
 import { AsyncAgentClient } from '@async-agent/api-js-client';
 import { browser } from '$app/environment';
+import axios from 'axios';
+
+// Configure global axios timeout (in milliseconds)
+axios.defaults.timeout = 60000; // 60 seconds
 
 // Get base URL from environment or default
 const getBaseUrl = (): string => {

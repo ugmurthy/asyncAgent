@@ -11,6 +11,9 @@
   import MermaidDiagram from "$lib/components/dag/MermaidDiagram.svelte";
   import MarkdownRenderer from "$lib/components/common/MarkdownRenderer.svelte";
   import MarkdownWithPdfExport from "$lib/components/common/MarkdownWithPdfExport.svelte";
+  import * as Dialog from "$lib/ui/dialog";
+  import { Download, FileText, ArrowUpDown } from "@lucide/svelte";
+  import { artifacts as artifactsApi } from "$lib/api/client";
   import { generateExecutionMermaid } from "$lib/utils/mermaid";
   import { formatDate, formatRelativeTime } from "$lib/utils/formatters";
   import { apiClient, getApiBaseUrl } from "$lib/api/client";
@@ -66,6 +69,7 @@
     error?: string | null;
     createdAt: string;
     subSteps: LocalSubStep[];
+    originalRequest?: string | null;
   }
 
   let { data }: { data: PageData } = $props();
@@ -92,6 +96,125 @@
   // Modal state for step details
   let selectedStep = $state<LocalSubStep | null>(null);
   let showStepModal = $state(false);
+
+  // Artifacts state
+  interface ArtifactInfo {
+    name: string;
+    taskId: string;
+    toolName: string;
+  }
+  let artifactsList = $derived(() => {
+    const artifacts: ArtifactInfo[] = [];
+    for (const step of subSteps) {
+      if (
+        step.toolOrPromptName === "writeFile" ||
+        step.toolOrPromptName === "readFile"
+      ) {
+        let filename = "";
+        if (step.toolOrPromptParams?.filename) {
+          filename = step.toolOrPromptParams.filename;
+        } else if (step.toolOrPromptParams?.path) {
+          filename = step.toolOrPromptParams.path;
+        } else if (typeof step.result === "object" && step.result?.path) {
+          filename = step.result.path;
+        } else if (typeof step.result === "string") {
+          try {
+            const parsed = JSON.parse(step.result);
+            if (parsed?.path) filename = parsed.path;
+          } catch {}
+        }
+        if (filename) {
+          artifacts.push({
+            name: filename,
+            taskId: step.taskId,
+            toolName: step.toolOrPromptName,
+          });
+        }
+      }
+    }
+    return artifacts;
+  });
+  let selectedArtifact = $state<ArtifactInfo | null>(null);
+  let artifactContent = $state("");
+  let isLoadingArtifact = $state(false);
+  let artifactSortOrder: "asc" | "desc" = $state("asc");
+  let markdownContainer: HTMLDivElement | null = $state(null);
+
+  let sortedArtifacts = $derived(() => {
+    const list = [...artifactsList()];
+    list.sort((a, b) => {
+      const cmp = a.name.localeCompare(b.name);
+      return artifactSortOrder === "asc" ? cmp : -cmp;
+    });
+    return list;
+  });
+
+  function toggleArtifactSort() {
+    artifactSortOrder = artifactSortOrder === "asc" ? "desc" : "asc";
+  }
+
+  async function openArtifact(artifact: ArtifactInfo) {
+    selectedArtifact = artifact;
+    isLoadingArtifact = true;
+    try {
+      const content = await artifactsApi.getArtifact({
+        filename: artifact.name,
+      });
+      artifactContent = content;
+    } catch (err) {
+      console.error("Failed to load artifact:", err);
+      artifactContent = "Failed to load artifact content.";
+    } finally {
+      isLoadingArtifact = false;
+    }
+  }
+
+  function downloadArtifactAsMarkdown() {
+    if (!selectedArtifact || !artifactContent) return;
+    const blob = new Blob([artifactContent], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = selectedArtifact.name.endsWith(".md")
+      ? selectedArtifact.name
+      : `${selectedArtifact.name}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadArtifactAsPDF() {
+    if (!markdownContainer) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const doc = printWindow.document;
+    doc.open();
+    doc.write("<!DOCTYPE html><html><head>");
+    doc.write(`<title>${selectedArtifact?.name || "Artifact"}</title>`);
+    Array.from(document.styleSheets).forEach((sheet) => {
+      try {
+        const styleEl = doc.createElement("style");
+        styleEl.textContent = Array.from(sheet.cssRules)
+          .map((rule) => rule.cssText)
+          .join("\n");
+        doc.head.appendChild(styleEl);
+      } catch {}
+    });
+    const printStyle = doc.createElement("style");
+    printStyle.textContent =
+      "@media print { body { margin: 20mm; } @page { margin: 20mm; } }";
+    doc.head.appendChild(printStyle);
+    doc.write('</head><body class="prose max-w-none p-8">');
+    doc.write(markdownContainer.innerHTML);
+    doc.write("</body></html>");
+    doc.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  }
 
   let synthesisStep = $derived(
     subSteps.find((s) => s.taskId === "__SYNTHESIS__") || null
@@ -338,15 +461,16 @@
 
 <div class="container mx-auto py-8 px-4">
   <div class="mb-6">
-    <Button variant="ghost" onclick={() => goto(`/dags/${execution.dag_id}`)}>
+    <Button variant="ghost" onclick={() => goto(`/dags/${execution.dagId}`)}>
       ← Back to DAG
     </Button>
   </div>
 
   <Tabs.Root value="tab-three" class="w-full">
-    <Tabs.List class="grid w-full grid-cols-5">
+    <Tabs.List class="grid w-full grid-cols-6">
       <Tabs.Trigger value="tab-one">The Task</Tabs.Trigger>
       <Tabs.Trigger value="tab-two">Result</Tabs.Trigger>
+      <Tabs.Trigger value="tab-artifacts">Artifacts</Tabs.Trigger>
       <Tabs.Trigger value="tab-three">Graph</Tabs.Trigger>
       <Tabs.Trigger value="tab-four">Events</Tabs.Trigger>
       <Tabs.Trigger value="tab-five">Steps</Tabs.Trigger>
@@ -382,26 +506,26 @@
               <p class="text-sm font-medium text-gray-500">DAG ID</p>
               <p class="text-sm">
                 <a
-                  href={`/dags/${execution.dag_id}`}
+                  href={`/dags/${execution.dagId}`}
                   class="text-blue-600 hover:underline"
                 >
-                  {execution.dag_id}
+                  {execution.dagId} : {execution.dagTitle}
                 </a>
               </p>
             </div>
             <div>
               <p class="text-sm font-medium text-gray-500">Started At</p>
               <p class="text-sm">
-                {execution.started_at
-                  ? formatDate(execution.started_at)
+                {execution.startedAt
+                  ? formatDate(execution.startedAt)
                   : "Not started"}
               </p>
             </div>
             <div>
               <p class="text-sm font-medium text-gray-500">Completed At</p>
               <p class="text-sm">
-                {execution.completed_at
-                  ? formatDate(execution.completed_at)
+                {execution.completedAt
+                  ? formatDate(execution.completedAt)
                   : "Not completed"}
               </p>
             </div>
@@ -419,7 +543,7 @@
             <div
               class="text-sm whitespace-pre-wrap h-80 overflow-y-auto border rounded bg-gray-50 p-3"
             >
-              {execution.original_request}
+              {execution.originalRequest}
             </div>
           </div>
         </Card.Content>
@@ -444,6 +568,81 @@
             />
           {:else}
             <p class="text-gray-500 italic">No results available.</p>
+          {/if}
+        </Card.Content>
+      </Card.Root>
+    </Tabs.Content>
+
+    <Tabs.Content value="tab-artifacts" class="space-y-4">
+      <Card.Root>
+        <Card.Header>
+          <Card.Title class="flex items-center justify-between">
+            <span>Artifacts ({sortedArtifacts().length})</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onclick={() => toggleArtifactSort()}
+              class="flex items-center gap-1 text-sm font-normal"
+            >
+              Sort by Name
+              <ArrowUpDown
+                size={14}
+                class={artifactSortOrder === "asc" ? "" : "rotate-180"}
+              />
+            </Button>
+          </Card.Title>
+          <Card.Description>
+            Files from writeFile and readFile operations
+          </Card.Description>
+        </Card.Header>
+        <Card.Content>
+          {#if sortedArtifacts().length > 0}
+            <Table.Root>
+              <Table.Header>
+                <Table.Row>
+                  <Table.Head>File Name</Table.Head>
+                  <Table.Head>Task</Table.Head>
+                  <Table.Head>Tool</Table.Head>
+                  <Table.Head class="text-right">Actions</Table.Head>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {#each sortedArtifacts() as artifact}
+                  <Table.Row
+                    class="cursor-pointer hover:bg-gray-50 transition-colors"
+                    onclick={() => openArtifact(artifact)}
+                  >
+                    <Table.Cell class="font-medium flex items-center gap-2">
+                      <FileText size={16} class="text-gray-500" />
+                      {artifact.name}
+                    </Table.Cell>
+                    <Table.Cell class="font-mono text-sm text-gray-600">
+                      {artifact.taskId}
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Badge variant="outline">{artifact.toolName}</Badge>
+                    </Table.Cell>
+                    <Table.Cell class="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onclick={(e: MouseEvent) => {
+                          e.stopPropagation();
+                          openArtifact(artifact);
+                        }}
+                      >
+                        View
+                      </Button>
+                    </Table.Cell>
+                  </Table.Row>
+                {/each}
+              </Table.Body>
+            </Table.Root>
+          {:else}
+            <EmptyState
+              title="No artifacts found"
+              description="No writeFile or readFile operations in this execution."
+            />
           {/if}
         </Card.Content>
       </Card.Root>
@@ -727,3 +926,56 @@
     </Card.Root>
   </div>
 {/if}
+
+<!-- Artifact Details Dialog -->
+<Dialog.Root
+  open={!!selectedArtifact}
+  onOpenChange={(open) => !open && (selectedArtifact = null)}
+>
+  <Dialog.Content class="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog.Header>
+      <Dialog.Title class="flex items-center gap-2">
+        <FileText size={20} />
+        {selectedArtifact?.name || "Artifact"}
+      </Dialog.Title>
+      <Dialog.Description>View and download artifact content</Dialog.Description
+      >
+    </Dialog.Header>
+
+    <div class="space-y-4">
+      <div class="flex gap-2">
+        <Button
+          onclick={downloadArtifactAsMarkdown}
+          variant="outline"
+          class="flex items-center gap-2"
+        >
+          <Download size={16} />
+          Download Markdown
+        </Button>
+        <Button
+          onclick={downloadArtifactAsPDF}
+          variant="outline"
+          class="flex items-center gap-2"
+        >
+          <Download size={16} />
+          Download PDF
+        </Button>
+      </div>
+
+      <div class="border rounded-lg p-4 bg-gray-50">
+        {#if isLoadingArtifact}
+          <p class="text-center text-gray-500">Loading artifact...</p>
+        {:else if artifactContent}
+          <div
+            bind:this={markdownContainer}
+            class="prose max-w-none dark:prose-invert"
+          >
+            <MarkdownRenderer source={artifactContent} />
+          </div>
+        {:else}
+          <p class="text-center text-gray-500">No content available</p>
+        {/if}
+      </div>
+    </div>
+  </Dialog.Content>
+</Dialog.Root>

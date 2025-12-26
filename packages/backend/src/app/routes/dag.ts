@@ -1511,9 +1511,11 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
 
       const { id } = paramsSchema.parse(request.params);
 
-      const executionResult = await db.all(
-        sql`SELECT * FROM executions WHERE id = ${id} LIMIT 1`
-      );
+      const executionResult = await db
+        .select()
+        .from(executions)
+        .where(eq(executions.id, id))
+        .limit(1);
 
       if (!executionResult || executionResult.length === 0) {
         return reply.code(404).send({
@@ -1628,13 +1630,18 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
 
       let executionsList;
       if (status) {
-        executionsList = await db.all(
-          sql`SELECT * FROM executions WHERE status = ${status} LIMIT ${limit} OFFSET ${offset}`
-        );
+        executionsList = await db
+          .select()
+          .from(executions)
+          .where(eq(executions.status, status))
+          .limit(limit)
+          .offset(offset);
       } else {
-        executionsList = await db.all(
-          sql`SELECT * FROM executions LIMIT ${limit} OFFSET ${offset}`
-        );
+        executionsList = await db
+          .select()
+          .from(executions)
+          .limit(limit)
+          .offset(offset);
       }
 
       return reply.code(200).send({
@@ -1826,9 +1833,11 @@ export async function dagRoutes(fastify: FastifyInstance, options: DAGRoutesOpti
 
     const { id } = params;
 
-    const executionResult = await db.all(
-      sql`SELECT * FROM executions WHERE id = ${id} LIMIT 1`
-    );
+    const executionResult = await db
+      .select()
+      .from(executions)
+      .where(eq(executions.id, id))
+      .limit(1);
 
     if (!executionResult || executionResult.length === 0) {
       return reply.code(404).send({

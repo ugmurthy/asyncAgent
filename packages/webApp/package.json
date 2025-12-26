@@ -33,6 +33,7 @@
     "@async-agent/api-js-client": "workspace:*",
     "@async-agent/shared": "workspace:*",
     "@shikijs/markdown-it": "^3.15.0",
+    "axios": "^1.13.1",
     "highlight.js": "^11.11.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.4",

@@ -30,7 +30,7 @@
       if (statusFilter !== "all" && execution.status !== statusFilter)
         return false;
       if (searchQuery) {
-        const dagTitle = (execution as any).dag_title || "";
+        const dagTitle = (execution as any).dagTitle || "";
         const executionId = execution.id || "";
         const searchLower = searchQuery.toLowerCase();
         if (
@@ -43,11 +43,11 @@
       return true;
     })
     .sort((a, b) => {
-      const field = sortField as "created_at" | "started_at";
+      const field = sortField as "createdAt" | "startedAt";
       const direction = sortDirection as "asc" | "desc";
 
-      const aVal = new Date(a[field] || a.created_at);
-      const bVal = new Date(b[field] || b.created_at);
+      const aVal = new Date(a[field] || a.createdAt);
+      const bVal = new Date(b[field] || b.createdAt);
 
       if (direction === "asc") {
         return aVal > bVal ? 1 : -1;
@@ -152,7 +152,7 @@
           <Table.Row class="bg-gray-200">
             <Table.Head>DAG Title</Table.Head>
             <Table.Head>Status</Table.Head>
-            <Table.Head>Progress</Table.Head>
+            <Table.Head>Costs</Table.Head>
             <Table.Head>Started</Table.Head>
             <Table.Head>Duration</Table.Head>
             <Table.Head class="text-right">Actions</Table.Head>
@@ -169,7 +169,7 @@
                   class="truncate"
                   title={(execution as any).dagTitle || execution.id}
                 >
-                  {(execution as any).dag_title || `${execution.id}`}
+                  {(execution as any).dagTitle || `${execution.id}`}
                 </div>
               </Table.Cell>
               <Table.Cell>
@@ -179,33 +179,31 @@
               </Table.Cell>
               <Table.Cell>
                 <div class="flex items-center gap-2">
-                  <div class="w-24 bg-gray-200 rounded-full h-2">
-                    <div
-                      class="bg-blue-600 h-2 rounded-full transition-all"
-                      style={`width: ${getProgressPercentage(execution)}%`}
-                    ></div>
-                  </div>
-                  <span class="text-sm text-muted-foreground">
-                    {getProgressPercentage(execution)}%
+                  <span
+                    class="text-sm text-muted-foreground"
+                    title={JSON.stringify(execution.totalUsage, null, 2)}
+                  >
+                    &#x20B9
+                    {parseFloat(execution.totalCostUsd * 100).toFixed(2)}
                   </span>
                 </div>
               </Table.Cell>
               <Table.Cell>
                 <span
                   class="text-sm text-muted-foreground"
-                  title={execution.started_at
-                    ? formatDate(execution.started_at)
+                  title={execution.startedAt
+                    ? formatDate(execution.startedAt)
                     : "Not started"}
                 >
-                  {execution.started_at
-                    ? formatRelativeTime(execution.started_at)
+                  {execution.startedAt
+                    ? formatRelativeTime(execution.startedAt)
                     : "Not started"}
                 </span>
               </Table.Cell>
               <Table.Cell>
                 <span class="text-sm text-muted-foreground">
-                  {#if execution.completed_at}
-                    {(execution.duration_ms / 1000).toFixed(0) + " s"}
+                  {#if execution.completedAt}
+                    {(execution.durationMs / 1000).toFixed(0) + " s"}
                   {:else}
                     -
                   {/if}
