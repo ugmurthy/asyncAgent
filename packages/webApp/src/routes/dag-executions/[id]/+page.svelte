@@ -9,6 +9,7 @@
   import StatusBadge from "$lib/components/common/StatusBadge.svelte";
   import EmptyState from "$lib/components/common/EmptyState.svelte";
   import MermaidDiagram from "$lib/components/dag/MermaidDiagram.svelte";
+  import VerticalProgressBar, { type ProgressStep } from "$lib/components/common/VerticalProgressBar.svelte";
   import MarkdownRenderer from "$lib/components/common/MarkdownRenderer.svelte";
   import MarkdownWithPdfExport from "$lib/components/common/MarkdownWithPdfExport.svelte";
   import * as Dialog from "$lib/ui/dialog";
@@ -85,6 +86,19 @@
 
   let subSteps = $derived((execution.subSteps || []) as LocalSubStep[]);
   let executionChart = $derived(generateExecutionMermaid(subSteps));
+
+  // Progress steps derived from subSteps for the VerticalProgressBar
+  let progressSteps = $derived<ProgressStep[]>(
+    subSteps.map((step) => ({
+      id: step.id,
+      taskId: step.taskId,
+      label: step.toolOrPromptName,
+      description: step.description || step.thought,
+      status: step.status,
+      timestamp: step.startedAt || step.createdAt,
+      durationMs: step.durationMs,
+    }))
+  );
 
   let markdownContent = $state<string | null>(null);
   let showResults = $state(false);
@@ -368,7 +382,8 @@
               : event.type === "substep.failed"
                 ? "failed"
                 : "running"),
-          result: event.result ?? currentSteps[index].result,
+          //result: event.result ?? currentSteps[index].result,
+          description: event.description ?? currentSteps[index].description,
           error: event.error ?? currentSteps[index].error,
           completedAt: event.timestamp
             ? new Date(event.timestamp).toISOString()
@@ -466,12 +481,13 @@
     </Button>
   </div>
 
-  <Tabs.Root value="tab-three" class="w-full">
-    <Tabs.List class="grid w-full grid-cols-6">
+  <Tabs.Root value="tab-progress" class="w-full">
+    <Tabs.List class="grid w-full grid-cols-7">
       <Tabs.Trigger value="tab-one">The Task</Tabs.Trigger>
       <Tabs.Trigger value="tab-two">Result</Tabs.Trigger>
       <Tabs.Trigger value="tab-artifacts">Artifacts</Tabs.Trigger>
       <Tabs.Trigger value="tab-three">Graph</Tabs.Trigger>
+      <Tabs.Trigger value="tab-progress">Progress</Tabs.Trigger>
       <Tabs.Trigger value="tab-four">Events</Tabs.Trigger>
       <Tabs.Trigger value="tab-five">Steps</Tabs.Trigger>
     </Tabs.List>
@@ -658,6 +674,30 @@
             chart={executionChart}
             id="execution-{execution.id}"
           />
+        </Card.Content>
+      </Card.Root>
+    </Tabs.Content>
+
+    <Tabs.Content value="tab-progress" class="space-y-4">
+      <Card.Root>
+        <Card.Header>
+          <Card.Title>Execution Progress</Card.Title>
+          <Card.Description>
+            Real-time progress of execution steps
+          </Card.Description>
+        </Card.Header>
+        <Card.Content>
+          <div class="max-h-[600px] overflow-y-auto pr-2">
+            <VerticalProgressBar
+              steps={progressSteps}
+              title="Step Progress"
+              showTimestamps={true}
+              onStepClick={(step) => {
+                const found = subSteps.find((s) => s.id === step.id);
+                if (found) openStepModal(found);
+              }}
+            />
+          </div>
         </Card.Content>
       </Card.Root>
     </Tabs.Content>
