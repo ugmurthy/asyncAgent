@@ -4,7 +4,11 @@
   import { Input } from "$lib/ui/input";
   import { Textarea } from "$lib/ui/textarea";
   import * as Card from "$lib/ui/card";
-  import { dag as dagApi, agents as agentsApi, task as taskApi } from "$lib/api/client";
+  import {
+    dag as dagApi,
+    agents as agentsApi,
+    task as taskApi,
+  } from "$lib/api/client";
   import { addNotification } from "$lib/stores/notifications";
   import { onMount } from "svelte";
   import { page } from "$app/stores";
@@ -14,7 +18,7 @@
   let agentName = "";
   let agents: Agent[] = [];
   let loadingAgents = false;
-  
+
   // Advanced settings
   let showAdvanced = false;
   let provider = "";
@@ -26,7 +30,7 @@
   let cronSchedule = "";
   let scheduleActive = false;
   let timezone = "Asia/Kolkata";
-  
+
   // Execute immediately
   let executeImmediately = false;
 
@@ -36,7 +40,7 @@
 
   async function handleEnhance() {
     if (!goalText.trim()) return;
-    
+
     isEnhancing = true;
     try {
       const response = await taskApi.executeTask({
@@ -51,7 +55,10 @@
       }
     } catch (error: any) {
       console.error("Failed to enhance goal:", error);
-      addNotification(error.message || "Failed to enhance goal description", "error");
+      addNotification(
+        error.message || "Failed to enhance goal description",
+        "error"
+      );
     } finally {
       isEnhancing = false;
     }
@@ -68,17 +75,18 @@
       const response = await agentsApi.listAgents({});
       // @ts-ignore - Handle potential API response wrapper vs direct array
       agents = response.agents || response || [];
-      
+
       if (Array.isArray(agents)) {
         // Default to DecomposerV7 if available, otherwise first active agent
-        const decomposerV7 = agents.find(a => a.name === "DecomposerV7");
-        if (decomposerV7) {
-            agentName = decomposerV7.name;
+        // Default to DecomposerV8 if available, otherwise first active agent
+        const decomposer = agents.find((a) => a.name === "DecomposerV8");
+        if (decomposer) {
+          agentName = decomposer.name;
         } else {
-            const activeAgent = agents.find(a => a.active);
-            if (activeAgent) {
-                agentName = activeAgent.name;
-            }
+          const activeAgent = agents.find((a) => a.active);
+          if (activeAgent) {
+            agentName = activeAgent.name;
+          }
         }
       }
     } catch (error: any) {
@@ -116,26 +124,27 @@
         "goal-text": goalText,
         agentName,
       };
-      
+
       if (provider) requestBody.provider = provider;
       if (model) requestBody.model = model;
-      
+
       // Convert numeric fields to numbers (HTML inputs return strings)
       const tempNum = Number(temperature);
       if (!Number.isNaN(tempNum) && tempNum !== 0.7) {
         requestBody.temperature = tempNum;
       }
-      
+
       const maxTokensNum = Number(maxTokens);
       if (!Number.isNaN(maxTokensNum) && maxTokensNum > 0) {
         requestBody.max_tokens = maxTokensNum;
       }
-      
+
       if (cronSchedule) {
         requestBody.cronSchedule = cronSchedule;
         requestBody.timezone = timezone;
       }
-      if (scheduleActive && cronSchedule) requestBody.scheduleActive = scheduleActive;
+      if (scheduleActive && cronSchedule)
+        requestBody.scheduleActive = scheduleActive;
 
       let response;
       if (executeImmediately) {
@@ -145,26 +154,28 @@
         response = await dagApi.createDag({ requestBody });
         addNotification("DAG created successfully", "success");
       }
-      
+
       // The response contains dagId if successful, or status: 'clarification_required'
       // @ts-ignore
-      if (response.status === 'success' && response.dagId) {
-         // @ts-ignore
-         if (executeImmediately && response.executionId) {
-           // @ts-ignore
-           goto(`/dag-executions/${response.executionId}`);
-         } else {
-           // @ts-ignore
-           goto(`/dags/${response.dagId}`);
-         }
-      // @ts-ignore
-      } else if (response.status === 'clarification_required') {
-         // @ts-ignore
-         addNotification(`Clarification needed: ${response.clarification_query}`, "warning");
+      if (response.status === "success" && response.dagId) {
+        // @ts-ignore
+        if (executeImmediately && response.executionId) {
+          // @ts-ignore
+          goto(`/dag-executions/${response.executionId}`);
+        } else {
+          // @ts-ignore
+          goto(`/dags/${response.dagId}`);
+        }
+        // @ts-ignore
+      } else if (response.status === "clarification_required") {
+        // @ts-ignore
+        addNotification(
+          `Clarification needed: ${response.clarification_query}`,
+          "warning"
+        );
       } else {
-         goto('/dags');
+        goto("/dags");
       }
-
     } catch (error: any) {
       console.error("Failed to create DAG:", error);
       addNotification(error.message || "Failed to create DAG", "error");
@@ -192,12 +203,19 @@
     </p>
   </div>
 
-  <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
+  <form
+    onsubmit={(e) => {
+      e.preventDefault();
+      handleSubmit();
+    }}
+    class="space-y-6"
+  >
     <Card.Root>
       <Card.Header>
         <Card.Title>Goal Details</Card.Title>
         <Card.Description>
-          Describe what you want to achieve. The agent will decompose this into tasks.
+          Describe what you want to achieve. The agent will decompose this into
+          tasks.
         </Card.Description>
       </Card.Header>
       <Card.Content class="space-y-4">
@@ -213,9 +231,9 @@
             class={errors.goalText ? "border-destructive" : ""}
           />
           <div class="flex justify-end">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               size="sm"
               disabled={!goalText.trim() || isEnhancing}
               onclick={handleEnhance}
@@ -235,7 +253,9 @@
           {#if loadingAgents}
             <p class="text-sm text-muted-foreground">Loading agents...</p>
           {:else if agents.length === 0}
-             <p class="text-sm text-destructive">No agents available. Please create an agent first.</p>
+            <p class="text-sm text-destructive">
+              No agents available. Please create an agent first.
+            </p>
           {:else}
             <select
               id="agentName"
@@ -247,7 +267,9 @@
               {/if}
               {#each agents as agent}
                 <option value={agent.name}>
-                  {agent.name} (v{agent.version}) {agent.active ? "" : "(Inactive)"}
+                  {agent.name} (v{agent.version}) {agent.active
+                    ? ""
+                    : "(Inactive)"}
                 </option>
               {/each}
             </select>
@@ -263,151 +285,172 @@
       <Card.Header>
         <Card.Title>Schedule Settings (Optional)</Card.Title>
         <Card.Description>
-          Set up a cron schedule to automatically execute this DAG at specified times
+          Set up a cron schedule to automatically execute this DAG at specified
+          times
         </Card.Description>
       </Card.Header>
       <Card.Content class="space-y-4">
-         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-           <div class="space-y-2">
-             <label for="cronSchedule" class="text-sm font-medium">Cron Schedule</label>
-             <Input
-               id="cronSchedule"
-               bind:value={cronSchedule}
-               placeholder="e.g., 0 9 * * * (daily at 9am)"
-             />
-             <p class="text-xs text-muted-foreground">
-               Examples: "0 9 * * *" (daily at 9am), "0 */6 * * *" (every 6 hours)
-             </p>
-           </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <label for="cronSchedule" class="text-sm font-medium"
+              >Cron Schedule</label
+            >
+            <Input
+              id="cronSchedule"
+              bind:value={cronSchedule}
+              placeholder="e.g., 0 9 * * * (daily at 9am)"
+            />
+            <p class="text-xs text-muted-foreground">
+              Examples: "0 9 * * *" (daily at 9am), "0 */6 * * *" (every 6
+              hours)
+            </p>
+          </div>
 
-           <div class="space-y-2">
-             <label for="timezone" class="text-sm font-medium">Time Zone</label>
-             <select
-               id="timezone"
-               bind:value={timezone}
-               class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-             >
-               <optgroup label="Common Zones">
-                 <option value="America/New_York">Eastern Time (ET)</option>
-                 <option value="America/Chicago">Central Time (CT)</option>
-                 <option value="America/Denver">Mountain Time (MT)</option>
-                 <option value="America/Los_Angeles">Pacific Time (PT)</option>
-                 <option value="UTC">UTC / GMT</option>
-                 <option value="Europe/London">London (GMT/BST)</option>
-                 <option value="Europe/Paris">Central European Time</option>
-               </optgroup>
-               <optgroup label="Asia/Pacific">
-                 <option value="Asia/Tokyo">Japan Standard Time</option>
-                 <option value="Asia/Shanghai">China Standard Time</option>
-                 <option value="Asia/Singapore">Singapore Time</option>
-                 <option value="Asia/Hong_Kong">Hong Kong Time</option>
-                 <option value="Asia/Dubai">Gulf Standard Time</option>
-                 <option value="Australia/Sydney">Sydney Time</option>
-               </optgroup>
-               <optgroup label="Other">
-                 <option value="America/Toronto">Toronto (EST/EDT)</option>
-                 <option value="America/Mexico_City">Mexico City (CST/CDT)</option>
-                 <option value="Brazil/Sao_Paulo">São Paulo (BRT/BRST)</option>
-                 <option value="Asia/Kolkata">India Standard Time</option>
-               </optgroup>
-             </select>
-             <p class="text-xs text-muted-foreground">
-               Current: {timezone}
-             </p>
-           </div>
-         </div>
+          <div class="space-y-2">
+            <label for="timezone" class="text-sm font-medium">Time Zone</label>
+            <select
+              id="timezone"
+              bind:value={timezone}
+              class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              <optgroup label="Common Zones">
+                <option value="America/New_York">Eastern Time (ET)</option>
+                <option value="America/Chicago">Central Time (CT)</option>
+                <option value="America/Denver">Mountain Time (MT)</option>
+                <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                <option value="UTC">UTC / GMT</option>
+                <option value="Europe/London">London (GMT/BST)</option>
+                <option value="Europe/Paris">Central European Time</option>
+              </optgroup>
+              <optgroup label="Asia/Pacific">
+                <option value="Asia/Tokyo">Japan Standard Time</option>
+                <option value="Asia/Shanghai">China Standard Time</option>
+                <option value="Asia/Singapore">Singapore Time</option>
+                <option value="Asia/Hong_Kong">Hong Kong Time</option>
+                <option value="Asia/Dubai">Gulf Standard Time</option>
+                <option value="Australia/Sydney">Sydney Time</option>
+              </optgroup>
+              <optgroup label="Other">
+                <option value="America/Toronto">Toronto (EST/EDT)</option>
+                <option value="America/Mexico_City"
+                  >Mexico City (CST/CDT)</option
+                >
+                <option value="Brazil/Sao_Paulo">São Paulo (BRT/BRST)</option>
+                <option value="Asia/Kolkata">India Standard Time</option>
+              </optgroup>
+            </select>
+            <p class="text-xs text-muted-foreground">
+              Current: {timezone}
+            </p>
+          </div>
+        </div>
 
-         <div class="flex items-center space-x-2">
-           <input
-             type="checkbox"
-             id="scheduleActive"
-             bind:checked={scheduleActive}
-             disabled={!cronSchedule}
-             class="h-4 w-4 rounded border-gray-300 disabled:opacity-50"
-           />
-           <label for="scheduleActive" class="text-sm font-medium {!cronSchedule ? 'text-muted-foreground' : ''}">
-             Activate schedule immediately
-           </label>
-         </div>
+        <div class="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="scheduleActive"
+            bind:checked={scheduleActive}
+            disabled={!cronSchedule}
+            class="h-4 w-4 rounded border-gray-300 disabled:opacity-50"
+          />
+          <label
+            for="scheduleActive"
+            class="text-sm font-medium {!cronSchedule
+              ? 'text-muted-foreground'
+              : ''}"
+          >
+            Activate schedule immediately
+          </label>
+        </div>
 
-         <div class="flex items-center space-x-2 pt-2 border-t">
-           <input
-             type="checkbox"
-             id="executeImmediately"
-             bind:checked={executeImmediately}
-             class="h-4 w-4 rounded border-gray-300"
-           />
-           <label for="executeImmediately" class="text-sm font-medium">
-             Create and execute immediately
-           </label>
-           <span class="text-xs text-muted-foreground">(runs DAG right after creation)</span>
-         </div>
-       </Card.Content>
+        <div class="flex items-center space-x-2 pt-2 border-t">
+          <input
+            type="checkbox"
+            id="executeImmediately"
+            bind:checked={executeImmediately}
+            class="h-4 w-4 rounded border-gray-300"
+          />
+          <label for="executeImmediately" class="text-sm font-medium">
+            Create and execute immediately
+          </label>
+          <span class="text-xs text-muted-foreground"
+            >(runs DAG right after creation)</span
+          >
+        </div>
+      </Card.Content>
     </Card.Root>
 
     <Card.Root>
       <Card.Header>
-        <div 
-            class="flex items-center justify-between cursor-pointer w-full" 
-            onclick={() => showAdvanced = !showAdvanced}
-            onkeydown={(e) => e.key === 'Enter' && (showAdvanced = !showAdvanced)}
-            role="button"
-            tabindex="0"
+        <div
+          class="flex items-center justify-between cursor-pointer w-full"
+          onclick={() => (showAdvanced = !showAdvanced)}
+          onkeydown={(e) => e.key === "Enter" && (showAdvanced = !showAdvanced)}
+          role="button"
+          tabindex="0"
         >
-            <Card.Title>Advanced Settings (Optional)</Card.Title>
-            <Button variant="ghost" size="sm">{showAdvanced ? 'Hide' : 'Show'}</Button>
+          <Card.Title>Advanced Settings (Optional)</Card.Title>
+          <Button variant="ghost" size="sm"
+            >{showAdvanced ? "Hide" : "Show"}</Button
+          >
         </div>
       </Card.Header>
       {#if showAdvanced}
-      <Card.Content class="space-y-4">
-         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card.Content class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="space-y-2">
-                <label for="provider" class="text-sm font-medium">LLM Provider</label>
-                <select
-                    id="provider"
-                    bind:value={provider}
-                    class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                >
-                    <option value="">Default (Server Config)</option>
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                    <option value="ollama">Ollama</option>
-                </select>
+              <label for="provider" class="text-sm font-medium"
+                >LLM Provider</label
+              >
+              <select
+                id="provider"
+                bind:value={provider}
+                class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="">Default (Server Config)</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="ollama">Ollama</option>
+              </select>
             </div>
             <div class="space-y-2">
-                <label for="model" class="text-sm font-medium">Model Name</label>
-                <Input 
-                    id="model" 
-                    bind:value={model} 
-                    placeholder="e.g. gpt-4o, claude-3-5-sonnet"
-                />
+              <label for="model" class="text-sm font-medium">Model Name</label>
+              <Input
+                id="model"
+                bind:value={model}
+                placeholder="e.g. gpt-4o, claude-3-5-sonnet"
+              />
             </div>
-         </div>
-         
-         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <div class="space-y-2">
-                <label for="temperature" class="text-sm font-medium">Temperature ({temperature})</label>
-                <input 
-                    id="temperature" 
-                    type="range" 
-                    min="0" 
-                    max="2" 
-                    step="0.1" 
-                    bind:value={temperature}
-                    class="w-full"
-                />
-             </div>
-             <div class="space-y-2">
-                <label for="maxTokens" class="text-sm font-medium">Max Tokens</label>
-                <Input 
-                    id="maxTokens" 
-                    type="number" 
-                    bind:value={maxTokens} 
-                    placeholder="Optional limit"
-                />
-             </div>
-         </div>
-      </Card.Content>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <label for="temperature" class="text-sm font-medium"
+                >Temperature ({temperature})</label
+              >
+              <input
+                id="temperature"
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                bind:value={temperature}
+                class="w-full"
+              />
+            </div>
+            <div class="space-y-2">
+              <label for="maxTokens" class="text-sm font-medium"
+                >Max Tokens</label
+              >
+              <Input
+                id="maxTokens"
+                type="number"
+                bind:value={maxTokens}
+                placeholder="Optional limit"
+              />
+            </div>
+          </div>
+        </Card.Content>
       {/if}
     </Card.Root>
 
