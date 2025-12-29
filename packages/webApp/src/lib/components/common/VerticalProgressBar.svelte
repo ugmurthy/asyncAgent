@@ -176,7 +176,7 @@
         <div class="flex-1 min-w-0 pt-0.5">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="font-medium text-sm {config.labelColor} text-black"
-              >{step.description?.slice(0, 80) + "..."}</span
+              >{step.description?.slice(0, 120) + "..."}</span
             >
             <span class="text-xs font-mono text-gray-400">{step.taskId}</span>
             {#if step.durationMs !== undefined && step.status === "completed"}

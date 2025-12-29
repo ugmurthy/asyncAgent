@@ -179,13 +179,17 @@
               </Table.Cell>
               <Table.Cell>
                 <div class="flex items-center gap-2">
-                  <span
-                    class="text-sm text-muted-foreground"
-                    title={JSON.stringify(execution.totalUsage, null, 2)}
-                  >
-                    &#x20B9
-                    {parseFloat(execution.totalCostUsd * 100).toFixed(2)}
-                  </span>
+                  {#if execution.completedAt}
+                    <span
+                      class="text-sm text-muted-foreground"
+                      title={JSON.stringify(execution.totalUsage, null, 2)}
+                    >
+                      {execution.totalTasks} tasks | &#x20B9
+                      {parseFloat(execution.totalCostUsd * 100).toFixed(2)}
+                    </span>
+                  {:else}
+                    -
+                  {/if}
                 </div>
               </Table.Cell>
               <Table.Cell>

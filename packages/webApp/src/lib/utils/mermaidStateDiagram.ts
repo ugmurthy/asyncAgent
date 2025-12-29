@@ -32,7 +32,7 @@ export function generateExecutionMermaid(subSteps: any[]): string {
 
   diagram += '  classDef pending fill:#f0f0f0,stroke:#ccc,color:#999\n';
   diagram += '  classDef waiting fill:#fff3e0,stroke:#ff9800\n';
-  diagram += '  classDef running fill:#e3f2fd,stroke:#2196f3\n';
+  diagram += '  classDef running fill:#e3f2fd,stroke:#2196f3,animation:pulse 2s infinite\n';
   diagram += '  classDef completed fill:#e8f5e9,stroke:#4caf50\n';
   diagram += '  classDef failed fill:#ffebee,stroke:#f44336\n';
 
