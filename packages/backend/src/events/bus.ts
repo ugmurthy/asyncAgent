@@ -9,7 +9,9 @@ export type DAGEventType =
   | 'substep.started'
   | 'substep.completed'
   | 'substep.failed'
-  | 'heartbeat';
+  | 'heartbeat'
+  | 'tool.progress'
+  | 'tool.completed';
 
 export interface BaseDAGEvent {
   type: DAGEventType;
@@ -78,6 +80,20 @@ export interface HeartbeatEvent extends BaseDAGEvent {
   type: 'heartbeat';
 }
 
+export interface ToolProgressEvent extends BaseDAGEvent {
+  type: 'tool.progress';
+  toolName: string;
+  message: string;
+  subStepId?: string;
+}
+
+export interface ToolCompletedEvent extends BaseDAGEvent {
+  type: 'tool.completed';
+  toolName: string;
+  message: string;
+  subStepId?: string;
+}
+
 export type DAGEvent =
   | ExecutionCreatedEvent
   | ExecutionUpdatedEvent
@@ -87,7 +103,9 @@ export type DAGEvent =
   | SubStepStartedEvent
   | SubStepCompletedEvent
   | SubStepFailedEvent
-  | HeartbeatEvent;
+  | HeartbeatEvent
+  | ToolProgressEvent
+  | ToolCompletedEvent;
 
 class DAGEventBus extends EventEmitter {
   emit(event: 'dag:event', data: DAGEvent): boolean {

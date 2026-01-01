@@ -545,14 +545,41 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
         const validatedInput = tool.inputSchema.parse(singleDependency !== null ? singleDependency : resolvedParams);
 
         const result = await tool.execute(validatedInput, {
+          db,
           logger,
           runId: `dag-${Date.now()}`,
           abortSignal: new AbortController().signal,
+          executionId: execId,
+          subStepId: task.id,
+          emitEvent: {
+            progress: (message: string) => {
+              dagEventBus.emit('dag:event', {
+                type: 'tool.progress',
+                executionId: execId,
+                toolName: tool.name,
+                message,
+                subStepId: task.id,
+                timestamp: Date.now(),
+              });
+            },
+            completed: (message: string) => {
+              dagEventBus.emit('dag:event', {
+                type: 'tool.completed',
+                executionId: execId,
+                toolName: tool.name,
+                message,
+                subStepId: task.id,
+                timestamp: Date.now(),
+              });
+            },
+          },
         });
 
         return { content: result };
       } else if (task.action_type === 'inference' || task.tool_or_prompt.name === 'inference') {
         const fullPrompt = this.buildInferencePrompt(task, globalContext, taskResults);
+        
+        //logger.info({fullPrompt},`fullPrompt`);  
         const agentName = task.tool_or_prompt.name;
         const agent = await db.query.agents.findFirst({
           where: eq(agents.name, agentName),
@@ -574,6 +601,30 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
           logger,
           runId: `dag-${Date.now()}`,
           abortSignal: new AbortController().signal,
+          executionId: execId,
+          subStepId: task.id,
+          emitEvent: {
+            progress: (message: string) => {
+              dagEventBus.emit('dag:event', {
+                type: 'tool.progress',
+                executionId: execId,
+                toolName: llmExecuteTool.name,
+                message,
+                subStepId: task.id,
+                timestamp: Date.now(),
+              });
+            },
+            completed: (message: string) => {
+              dagEventBus.emit('dag:event', {
+                type: 'tool.completed',
+                executionId: execId,
+                toolName: llmExecuteTool.name,
+                message,
+                subStepId: task.id,
+                timestamp: Date.now(),
+              });
+            },
+          },
         });
 
         return {
