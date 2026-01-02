@@ -20,7 +20,7 @@ import {
   ExecutionIdParamsSchema,
   DagExperimentsInputSchema
 } from '../schemas.js';
-import { extractJsonCodeBlock, truncate, truncateForLog } from '../utils.js';
+import { extractJsonCodeBlock, renumberSubTasks, truncate, truncateForLog } from '../utils.js';
 import type { RouteContext } from '../types.js';
 
 export function registerExecuteDagRoutes(
@@ -176,7 +176,7 @@ export function registerExecuteDagRoutes(
           continue;
         }
 
-        const dag = validatedResult.data;
+        let dag = validatedResult.data;
 
         if (dag.clarification_needed) {
           return reply.code(200).send({
@@ -189,6 +189,8 @@ export function registerExecuteDagRoutes(
         }
 
         if (dag.validation.coverage === 'high') {
+          dag = renumberSubTasks(dag);
+          
           const dagId = generateId();
           
           let dagTitle: string | null = null;

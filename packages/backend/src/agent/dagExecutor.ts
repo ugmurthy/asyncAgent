@@ -191,32 +191,12 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
   ): { resolvedParams: Record<string, any>; singleDependency: any | null } {
     const resolvedParams = { ...params };
     let singleDependency: any = null;
-    const DEPENDENCY_PATTERN = /<Results? (?:from|of) Task (\d+)>/g;
+
 
     for (const [key, value] of Object.entries(resolvedParams)) {
-      // followig line commented 19/Nov/25
-      // as params:urls sometime has an object (array) - we don't want that ignored 
-      //if (typeof value !== 'string') continue;
-
-      //const exactMatch = value.match(/^<Results? (?:from|of) Task (\d+)>$/);
       
-      // if (exactMatch) {
-      //   this.handleExactMatch(exactMatch, key, params, tool, taskResults, logger, resolvedParams, (result) => {
-      //     singleDependency = result;
-      //   });
-      // } else if (value.match(DEPENDENCY_PATTERN)) {
-      //   this.handleMultipleMatches(value, key, tool, taskResults, logger, resolvedParams);
-      // }
-
-      // Following check isn't necessary : coding agent glitch 19/Nov/25
-      //if (value.match(DEPENDENCY_PATTERN)) {
          this.handleMultipleMatches(value, key, tool, taskResults, logger, resolvedParams);
-      //}
-      // experimental function to detect dependencies
-      //const result=this.extractTaskNumbers(value);
-      //if (result.length>0){
-      //  logger.info({result},'result');
-      //} 
+      
     }
 
     //logger.debug({ resolvedParams, singleDependency }, 'resolvedParams, singleDependency');
@@ -510,6 +490,7 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
         if (task.dependencies.length === 0 || task.dependencies.includes('none')) {
           return true;
         }
+        // check if every sub_task in dependencies has been executed.
         return task.dependencies.every(dep => executedTasks.has(dep));
       };
 

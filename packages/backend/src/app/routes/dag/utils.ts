@@ -2,6 +2,11 @@
  * Utility functions for DAG route handlers
  */
 
+import { z } from 'zod';
+import { DecomposerJobSchema } from './schemas.js';
+
+type DecomposerJob = z.infer<typeof DecomposerJobSchema>;
+
 /**
  * Extracts and parses JSON content from a markdown code block.
  * @param response - The markdown string containing a JSON code block
@@ -154,4 +159,36 @@ export function formatDateByGroup(date: Date, groupBy: 'day' | 'week' | 'month')
     default:
       return date.toISOString().split('T')[0];
   }
+}
+
+/**
+ * Renumbers sub_tasks IDs to sequential "001", "002", etc. format
+ * and updates all dependency references accordingly.
+ * @param data - The decomposer job containing sub_tasks
+ * @returns The same decomposer job with renumbered task IDs
+ */
+export function renumberSubTasks(data: DecomposerJob): DecomposerJob {
+  const idOrder: string[] = [];
+  const seen = new Set<string>();
+
+  for (const task of data.sub_tasks) {
+    if (!seen.has(task.id)) {
+      seen.add(task.id);
+      idOrder.push(task.id);
+    }
+  }
+
+  const mapping: Record<string, string> = {};
+  idOrder.forEach((oldId, index) => {
+    mapping[oldId] = String(index + 1).padStart(3, '0');
+  });
+
+  for (const task of data.sub_tasks) {
+    task.dependencies = task.dependencies.map((dep) => {
+      return Object.prototype.hasOwnProperty.call(mapping, dep) ? mapping[dep] : dep;
+    });
+    task.id = mapping[task.id];
+  }
+
+  return data;
 }

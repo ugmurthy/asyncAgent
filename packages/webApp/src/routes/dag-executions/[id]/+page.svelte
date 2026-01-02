@@ -9,7 +9,7 @@
   import StatusBadge from "$lib/components/common/StatusBadge.svelte";
   import EmptyState from "$lib/components/common/EmptyState.svelte";
   import MermaidDiagram from "$lib/components/dag/MermaidDiagram.svelte";
-  import VerticalProgressBar, { type ProgressStep } from "$lib/components/common/VerticalProgressBar.svelte";
+  import VerticalProgressBar, { type ProgressStep, type ToolProgress } from "$lib/components/common/VerticalProgressBar.svelte";
   import MarkdownRenderer from "$lib/components/common/MarkdownRenderer.svelte";
   import MarkdownWithPdfExport from "$lib/components/common/MarkdownWithPdfExport.svelte";
   import * as Dialog from "$lib/ui/dialog";
@@ -99,6 +99,7 @@
       status: step.status,
       timestamp: step.startedAt || step.createdAt,
       durationMs: step.durationMs,
+      toolProgress: toolProgressMap[step.taskId] || [],
     }))
   );
 
@@ -108,6 +109,9 @@
   let lastProcessedResult = $state<any>(null);
   let events = $state<any[]>([]);
   let eventsContainer: HTMLDivElement | null = null;
+
+  // Tool progress tracking by subStepId
+  let toolProgressMap = $state<Record<string, ToolProgress[]>>({});
 
   // Modal state for step details
   let selectedStep = $state<LocalSubStep | null>(null);
@@ -331,6 +335,8 @@
       "substep.started",
       "substep.completed",
       "substep.failed",
+      "tool.progress",
+      "tool.completed",
     ];
 
     for (const type of eventTypes) {
@@ -411,6 +417,23 @@
       // Direct property write triggers reactivity clearly
       execution.status = newStatus;
       invalidate("dag-execution:detail");
+    } else if (event.type === "tool.progress" || event.type === "tool.completed") {
+      // Handle tool progress events
+      const subStepId = event.subStepId;
+      if (subStepId) {
+        const toolProgress: ToolProgress = {
+          toolName: event.toolName || "unknown",
+          message: event.message || "",
+          timestamp: event.timestamp,
+        };
+        
+        // Update toolProgressMap reactively
+        const existing = toolProgressMap[subStepId] || [];
+        toolProgressMap = {
+          ...toolProgressMap,
+          [subStepId]: [...existing, toolProgress],
+        };
+      }
     }
   }
 

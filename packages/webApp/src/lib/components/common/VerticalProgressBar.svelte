@@ -8,6 +8,12 @@
     Ban,
   } from "@lucide/svelte";
 
+  export interface ToolProgress {
+    toolName: string;
+    message: string;
+    timestamp?: string;
+  }
+
   export interface ProgressStep {
     id: string;
     taskId: string;
@@ -22,6 +28,7 @@
       | "blocked";
     timestamp?: string;
     durationMs?: number;
+    toolProgress?: ToolProgress[];
   }
 
   interface Props {
@@ -194,6 +201,23 @@
             <p class="text-xs text-gray-400 mt-1">
               {formatTimestamp(step.timestamp)}
             </p>
+          {/if}
+
+          {#if step.toolProgress && step.toolProgress.length > 0}
+            <div class="mt-2 space-y-1 border-l-2 border-gray-200 pl-3">
+              {#each step.toolProgress.slice(-2) as progress}
+                <div class="text-xs">
+                  <span class="font-medium text-gray-600"
+                    >{progress.toolName}:</span
+                  >
+                  <span class="text-gray-500 ml-1"
+                    >{progress.message.length > 90
+                      ? progress.message.slice(0, 90) + "..."
+                      : progress.message}</span
+                  >
+                </div>
+              {/each}
+            </div>
           {/if}
         </div>
 

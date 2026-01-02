@@ -12,7 +12,7 @@ import { LlmExecuteTool } from '../../../../agent/tools/llmExecute.js';
 import { agents, dags } from '../../../../db/schema.js';
 import { validateCronExpression } from '../../../../utils/cron-validator.js';
 import { CreateDagInputSchema, DecomposerJobSchema } from '../schemas.js';
-import { extractCodeBlock, truncate, truncateForLog } from '../utils.js';
+import { extractCodeBlock, renumberSubTasks, truncate, truncateForLog } from '../utils.js';
 import type { RouteContext, PlanningAttempt, PlanningUsageTotal } from '../types.js';
 
 export function registerCreateDagRoute(
@@ -216,7 +216,7 @@ export function registerCreateDagRoute(
           generationStats: attemptGenStats,
         });
 
-        const dag = validatedResult.data;
+        let dag = validatedResult.data;
 
         if (dag.clarification_needed) {
           log.info({ clarification_query: dag.clarification_query }, 'Clarification required');
@@ -230,6 +230,7 @@ export function registerCreateDagRoute(
         }
 
         if (dag.validation.coverage === 'high') {
+          dag = renumberSubTasks(dag);
           const dagId = generateId();
           
           let dagTitle: string | null = null;
