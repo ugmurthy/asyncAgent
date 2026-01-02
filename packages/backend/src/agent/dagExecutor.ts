@@ -200,8 +200,8 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
          this.handleMultipleMatches(value, key, task, taskResults, logger, resolvedParams);
       
     }
-
-    //logger.debug({ resolvedParams, singleDependency }, 'resolvedParams, singleDependency');
+    // to DEBUG
+    //logger.info({ resolvedParams, singleDependency }, 'resolvedParams, singleDependency');
     return { resolvedParams, singleDependency };
   }
 // this function is not longer used but a good one for extracting task #'s
@@ -314,9 +314,8 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
 
     if (tool === 'fetchURLs') {
       resolvedParams[key] = this.resolveFetchURLs(task, key, taskResults, logger);
-    }
-      if (tool === 'writeFile' && key === 'content') {
-        resolvedParams[key] = this.resolveWriteFileContent(task,taskResults, logger);
+    } else if (tool === 'writeFile' && key === 'content') {
+      resolvedParams[key] = this.resolveWriteFileContent(task,taskResults, logger);
     } else {
       resolvedParams[key] = this.resolveStringReplacements(value, matches, key, taskResults, logger);
     }

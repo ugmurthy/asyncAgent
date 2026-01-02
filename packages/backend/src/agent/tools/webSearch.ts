@@ -43,7 +43,7 @@ export class WebSearchTool extends BaseTool<WebSearchInput, SearchResult[]> {
         const html = await response.text();
         const results = this.parseSearchResults(html, input.limit);
 
-        ctx.logger.info(` ╰─Found ${results.length} search results for query: ${query}`);
+        ctx.logger.info(` ╰─Found ${results.length} search results for query: ${query.slice(0, 50)+'...'}`);
         allResults.push(results);
       } catch (error) {
         ctx.logger.error({ err: error, query }, ' ╰─Web search failed');
