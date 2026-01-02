@@ -158,7 +158,7 @@ export class OpenRouterFetchProvider implements LLMProvider {
 
   async extractGenerationId(data: OpenAIChatCompletionResponse, maxAttempts = 5, initialDelayMs = 500): Promise<any> {
     const generationId = data.id;
-    logger.info({url:`${BASE_URL}/generation?id=${generationId}`}, 'Generation url')
+    logger.debug({url:`${BASE_URL}/generation?id=${generationId}`}, 'Generation url')
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -206,7 +206,7 @@ export class OpenRouterFetchProvider implements LLMProvider {
   }
 
   async validateToolCallSupport(model: string): Promise<{ 'tools-supported': boolean; 'supported': boolean }> {
-    logger.info({ model }, "Validating model tool support");
+    logger.debug({ model }, "Validating model tool support");
     try {
       const res = await openRouterFetch(`/parameters/${model}`, this.apiKey);
       
@@ -220,7 +220,7 @@ export class OpenRouterFetchProvider implements LLMProvider {
       
       const data = await res.json() as { supported_parameters?: string[] };
       const toolsSupported = data.supported_parameters?.includes('tools') ?? false;
-      logger.info({ 'tools-supported': toolsSupported, 'supported': true },'Validation result')
+      logger.debug({ 'tools-supported': toolsSupported, 'supported': true },'Validation result')
       logger.debug({ ...data},'Validation details')
       return { 'tools-supported': toolsSupported, 'supported': true };
     } catch (error) {

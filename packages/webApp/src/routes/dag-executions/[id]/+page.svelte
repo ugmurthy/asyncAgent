@@ -9,7 +9,10 @@
   import StatusBadge from "$lib/components/common/StatusBadge.svelte";
   import EmptyState from "$lib/components/common/EmptyState.svelte";
   import MermaidDiagram from "$lib/components/dag/MermaidDiagram.svelte";
-  import VerticalProgressBar, { type ProgressStep, type ToolProgress } from "$lib/components/common/VerticalProgressBar.svelte";
+  import VerticalProgressBar, {
+    type ProgressStep,
+    type ToolProgress,
+  } from "$lib/components/common/VerticalProgressBar.svelte";
   import MarkdownRenderer from "$lib/components/common/MarkdownRenderer.svelte";
   import MarkdownWithPdfExport from "$lib/components/common/MarkdownWithPdfExport.svelte";
   import * as Dialog from "$lib/ui/dialog";
@@ -377,7 +380,8 @@
       // Update specific substep in list
       const currentSteps = [...(execution.subSteps || [])];
       const index = currentSteps.findIndex(
-        (s) => s.taskId === String(event.taskId)
+        (s) => s.taskId === String(event.subStepId)
+        //(s) => s.taskId === String(event.taskId)
       );
 
       if (index !== -1) {
@@ -417,7 +421,10 @@
       // Direct property write triggers reactivity clearly
       execution.status = newStatus;
       invalidate("dag-execution:detail");
-    } else if (event.type === "tool.progress" || event.type === "tool.completed") {
+    } else if (
+      event.type === "tool.progress" ||
+      event.type === "tool.completed"
+    ) {
       // Handle tool progress events
       const subStepId = event.subStepId;
       if (subStepId) {
@@ -426,7 +433,7 @@
           message: event.message || "",
           timestamp: event.timestamp,
         };
-        
+
         // Update toolProgressMap reactively
         const existing = toolProgressMap[subStepId] || [];
         toolProgressMap = {
@@ -863,7 +870,12 @@
       <Card.Header>
         <div class="flex items-start justify-between">
           <div>
-            <Card.Title>Step Details: {selectedStep.id}</Card.Title>
+            <Card.Title
+              >Step Details:
+              {selectedStep.taskId}
+              {":"}
+              {selectedStep.id}</Card.Title
+            >
             <Card.Description>
               Tool/Prompt: {selectedStep.toolOrPromptName}
             </Card.Description>
@@ -946,7 +958,12 @@
 
         {#if selectedStep.dependencies && selectedStep.dependencies.length > 0}
           <div>
-            <p class="text-sm font-medium text-gray-500">Dependencies</p>
+            <p class="text-sm font-medium text-gray-500">
+              Dependencies of sub task:<Badge
+                variant="outline"
+                class="mt-2 text-blue-800">{selectedStep.taskId}</Badge
+              >
+            </p>
             <div class="flex flex-wrap gap-2 mt-2">
               {#each selectedStep.dependencies as dep}
                 <Badge variant="outline">{dep}</Badge>

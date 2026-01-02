@@ -184,18 +184,20 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
   }
 
   private resolveDependencies(
-    params: Record<string, any>,
+    task: Record<string, any>,
     taskResults: Map<string, any>,
-    logger: Logger,
-    tool: string
+    logger: Logger
+    
   ): { resolvedParams: Record<string, any>; singleDependency: any | null } {
+    const params = task.tool_or_prompt.params;
     const resolvedParams = { ...params };
     let singleDependency: any = null;
-
+    
+    const tool = task.tool_or_prompt.name;
 
     for (const [key, value] of Object.entries(resolvedParams)) {
       
-         this.handleMultipleMatches(value, key, tool, taskResults, logger, resolvedParams);
+         this.handleMultipleMatches(value, key, task, taskResults, logger, resolvedParams);
       
     }
 
@@ -300,24 +302,72 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
   private handleMultipleMatches(
     value: string,
     key: string,
-    tool: string,
+    task: Record<string, any>,
     taskResults: Map<string, any>,
     logger: Logger,
     resolvedParams: Record<string, any>
   ): void {
-    const DEPENDENCY_PATTERN = /<Results? (?:from|of) Task (\d+)>/g;
-    const matches = [...String(value).matchAll(DEPENDENCY_PATTERN)];
     
-    logger.debug({matches},`╰─matches ${tool}`);
+    const tool= task.tool_or_prompt.name;
+    const DEPENDENCY_PATTERN = /<Results? (?:from|of) Task (\d+)>/g
+    const matches = [...String(value).matchAll(DEPENDENCY_PATTERN)];  
 
     if (tool === 'fetchURLs') {
-      resolvedParams[key] = this.resolveFetchURLs(matches, key, taskResults, logger);
+      resolvedParams[key] = this.resolveFetchURLs(task, key, taskResults, logger);
+    }
+      if (tool === 'writeFile' && key === 'content') {
+        resolvedParams[key] = this.resolveWriteFileContent(task,taskResults, logger);
     } else {
       resolvedParams[key] = this.resolveStringReplacements(value, matches, key, taskResults, logger);
     }
   }
 
-  private resolveFetchURLs(
+private resolveWriteFileContent(
+  task: Record<string, any>,
+  taskResults:Map<string, any>,
+  logger:Logger ):string {
+
+  const contentArray=[]
+  for (const deps of task.dependencies) {
+    let depResult = taskResults.get(deps);
+    if (typeof depResult === 'string') {
+      logger.info(`╰─dependency reference in : Task ${deps} - content`);
+      contentArray.push(depResult)
+      }
+    }
+  return contentArray.join('\n');    
+  }
+
+
+ private resolveFetchURLs(
+    task: Record<string, any>,
+    key: string,
+    taskResults: Map<string, any>,
+    logger: Logger
+  ): string[] {
+    const urlArray: string[] = [];
+    
+    for (const deps of task.dependencies) {
+      
+      const depResult = taskResults.get(deps);
+      
+      const urls = Array.isArray(depResult)
+        ? depResult.map((obj) => obj.url).filter(Boolean)
+        : typeof depResult === 'string'
+        ? this.extractUrls(depResult)
+        : [];
+
+      if (urls.length) {
+        urlArray.push(...urls);
+      }
+      
+      logger.info(`╰─dependency reference in '${key}': Task ${deps} - URLs`);
+    }
+
+    return urlArray;
+  }
+
+  private resolveFetchURLs_RE(
     matches: RegExpMatchArray[],
     key: string,
     taskResults: Map<string, any>,
@@ -496,8 +546,17 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
 
     const executeTask = async (task: SubTask): Promise<TaskExecutionResult> => {
       const taskStartTime = Date.now();
-      logger.info({id:task.id,description:task.description},`Executing sub-task`);
-      logger.info({tool_or_prompt:task.tool_or_prompt},`╰─task_or_prompt`)
+      
+      const symbols = {
+        "writeFile":"📄",
+        "readFile":"📖",
+        "inference":"✨",
+        "webSearch":"🔎",
+        "fetchURLs":"🌐"
+      }
+      const displaySym = symbols[task.tool_or_prompt.name] || "⚙️";
+      logger.info(`${displaySym} Executing sub-task ${task.id} ${task.description.slice(0,50)+'...'}`);
+      
       
       await db.update(subSteps)
         .set({ status: 'running', startedAt: new Date() })
@@ -521,8 +580,8 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
           throw new Error(`Tool not found: ${task.tool_or_prompt.name}`);
         }
 
-        const params = task.tool_or_prompt.params || {};
-        const { resolvedParams, singleDependency } = this.resolveDependencies(params, taskResults, logger,task.tool_or_prompt.name);
+        //const params = task.tool_or_prompt.params || {};
+        const { resolvedParams, singleDependency } = this.resolveDependencies(task, taskResults, logger);
         const validatedInput = tool.inputSchema.parse(singleDependency !== null ? singleDependency : resolvedParams);
 
         const result = await tool.execute(validatedInput, {
@@ -670,7 +729,7 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
               result: serializedResult,
             });
             
-            logger.info(`Task ${task.id} completed successfully`);
+            //logger.info(`Task ${task.id} completed successfully`);
           } catch (error) {
             logger.error({ err: error }, `Task ${task.id} failed`);
             
@@ -713,7 +772,7 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
       db
     );
 
-    logger.info('Synthesis completed, running validation');
+    logger.info('╰─Synthesis completed, running validation');
 
     const validatedResult = await this.validate(synthesisResult.content, logger);
 

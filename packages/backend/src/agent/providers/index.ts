@@ -59,7 +59,7 @@ export async function validateLLMSetup(provider?: LLMProvider, model?: string): 
   const llmProvider = provider || createLLMProvider();
   const llmModel = model || env.LLM_MODEL;
 
-  logger.info(`Validating LLM provider: ${llmProvider.name} with model: ${llmModel}`);
+  logger.debug(`Validating LLM provider: ${llmProvider.name} with model: ${llmModel}`);
 
   const result = await llmProvider.validateToolCallSupport(llmModel);
 

@@ -40,7 +40,7 @@ export class FetchURLsTool extends BaseTool<FetchURLsInput, FetchURLsOutput> {
           new URL(item);
           urls.push(item);
         } catch {
-          ctx.logger.warn(`Invalid URL string: ${item}`);
+          ctx.logger.warn(`╰─Invalid URL string: ${item}`);
         }
       } else if (typeof item === 'object' && item !== null) {
         const possibleURLKeys = ['url', 'URL', 'link', 'href', 'uri'];
@@ -60,12 +60,12 @@ export class FetchURLsTool extends BaseTool<FetchURLsInput, FetchURLsOutput> {
         }
 
         if (!foundURL) {
-          ctx.logger.warn(`No valid URL found in object: ${JSON.stringify(item)}`);
+          ctx.logger.warn(`╰─No valid URL found in object: ${JSON.stringify(item)}`);
         }
       }
     }
 
-    ctx.logger.info(`Extracted ${urls.length} valid URLs from ${input.urls.length} items`);
+    ctx.logger.info(`╰─Extracted ${urls.length} valid URLs from ${input.urls.length} items`);
 
     const results: FetchPageOutput[] = [];
 
@@ -74,7 +74,7 @@ export class FetchURLsTool extends BaseTool<FetchURLsInput, FetchURLsOutput> {
         const result = await this.fetchPageTool.execute({ url, maxLength: 10000 }, ctx);
         results.push(result);
       } catch (error) {
-        ctx.logger.error({ err: error }, `Failed to fetch ${url}`);
+        ctx.logger.error({ err: error }, `╰─Failed to fetch ${url}`);
       }
     }
 

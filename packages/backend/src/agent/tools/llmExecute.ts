@@ -85,12 +85,12 @@ export class LlmExecuteTool extends BaseTool<LlmExecuteInput, LlmExecuteOutput> 
   }
 
   async execute(input: LlmExecuteInput, ctx: ToolContext): Promise<LlmExecuteOutput> {
-    ctx.logger.info({
+    ctx.logger.debug({
       provider: input.provider,
       model: input.model,
       //task: input.task,
       hasAttachments: !!input.attachments?.length,
-    }, 'Executing LLM call');
+    }, '╰─Executing LLM call');
 
     try {
       const provider = createLLMProvider({
@@ -100,7 +100,7 @@ export class LlmExecuteTool extends BaseTool<LlmExecuteInput, LlmExecuteOutput> 
 
       const validation = await provider.validateToolCallSupport(input.model);
       if (!validation.supported) {
-        ctx.logger.warn(`Model ${input.model} not supported: ${validation.message}`);
+        ctx.logger.warn(` ╰─Model ${input.model} not supported: ${validation.message}`);
       }
 
       let userContent: MessageContent = input.prompt;
@@ -151,10 +151,7 @@ export class LlmExecuteTool extends BaseTool<LlmExecuteInput, LlmExecuteOutput> 
 
           userContent = contentParts;
           
-          ctx.logger.info({
-            textFiles: textFiles.length,
-            imageFiles: imageFiles.length,
-          }, 'Using multimodal content with images');
+          ctx.logger.info(` ╰─Using multimodal content with ${textFiles.length} docs & ${imageFiles.length} images`);
         } else {
           if (hasImages && !supportsMultimodal) {
             ctx.logger.warn({
@@ -192,7 +189,7 @@ export class LlmExecuteTool extends BaseTool<LlmExecuteInput, LlmExecuteOutput> 
         maxTokens,
       });
 
-      ctx.logger.info('LLM execution completed');
+      ctx.logger.debug('LLM execution completed');
 
       return {
         content: response.content,

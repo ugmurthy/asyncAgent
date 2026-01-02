@@ -22,9 +22,9 @@ export class WebSearchTool extends BaseTool<WebSearchInput, SearchResult[]> {
   inputSchema = webSearchInputSchema;
 
   async execute(input: WebSearchInput, ctx: ToolContext): Promise<SearchResult[]> {
-    ctx.logger.info({query:input.query},`  ╰─Searching web...input`);
+    ctx.logger.info(` ╰─Searching web...input for ${input.query.slice(50)+'...'}`);
     const queries = this.extractSearchQueries(input.query);
-    ctx.logger.info({queries},`  ╰─Searching web...input as list`);
+    //ctx.logger.info({queries},` ╰─Searching web...input as list`);
     const allResults: SearchResult[][] = [];
 
     for (const query of queries) {
@@ -43,10 +43,10 @@ export class WebSearchTool extends BaseTool<WebSearchInput, SearchResult[]> {
         const html = await response.text();
         const results = this.parseSearchResults(html, input.limit);
 
-        ctx.logger.info(`   ╰─Found ${results.length} search results for query: ${query}`);
+        ctx.logger.info(` ╰─Found ${results.length} search results for query: ${query}`);
         allResults.push(results);
       } catch (error) {
-        ctx.logger.error({ err: error, query }, '   ╰─Web search failed');
+        ctx.logger.error({ err: error, query }, ' ╰─Web search failed');
         throw error;
       }
     }

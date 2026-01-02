@@ -47,7 +47,7 @@ export class FetchPageTool extends BaseTool<FetchPageInput, FetchPageOutput> {
     }
 
     ctx.logger.info(`🌐 fetching : ${input.url}`);
-    ctx.emitEvent?.progress(`Fetching URL: ${input.url}`);
+    ctx.emitEvent?.progress(`🌐 fetching: ${input.url}`);
 
     try {
       const response = await this.withTimeout(
@@ -111,24 +111,6 @@ export class FetchPageTool extends BaseTool<FetchPageInput, FetchPageOutput> {
       ctx.logger.error({ err: (error as Error)?.message }, 'Page fetch failed');
       throw error;
     }
-  }
-
-  private extractPdfTitle(pdfData: Awaited<ReturnType<typeof pdfParse>>, url: string): string {
-    if (pdfData.info?.Title) {
-      return pdfData.info.Title;
-    }
-    const urlPath = new URL(url).pathname;
-    const filename = urlPath.split('/').pop() || 'document.pdf';
-    return filename.replace('.pdf', '');
-  }
-
-  private cleanPdfText(text: string): string {
-    return text
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-      .join('\n')
-      .replace(/\n{3,}/g, '\n\n');
   }
 
   private extractTextContent(html: string): { title: string; content: string } {
