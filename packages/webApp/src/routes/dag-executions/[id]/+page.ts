@@ -2,7 +2,9 @@ import { apiClient } from '$lib/api/client';
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ params }) => {
+export const load: PageLoad = async ({ params, depends }) => {
+	depends('dag-execution:detail');
+	
 	try {
 		const execution = await apiClient.dag.getDagExecution({ id: params.id });
 		

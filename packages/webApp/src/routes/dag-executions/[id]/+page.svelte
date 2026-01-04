@@ -81,16 +81,24 @@
 
   let execution = $state(data.execution as unknown as LocalExecution);
 
-  // Update local state when data changes (e.g. navigation)
+  // Update local state when data changes (e.g. navigation or invalidation)
   $effect(() => {
-    if (data.execution.id !== execution.id) {
-      execution = data.execution as unknown as LocalExecution;
+    const incoming = data.execution as unknown as LocalExecution;
+    if (
+      incoming.id !== execution.id ||
+      incoming.status !== execution.status ||
+      incoming.subSteps?.length !== execution.subSteps?.length
+    ) {
+      execution = incoming;
     }
   });
 
   let subSteps = $derived((execution.subSteps || []) as LocalSubStep[]);
   let executionChart = $derived(generateExecutionMermaid(subSteps));
   let executionStateChart = $derived(generateExecutionStateDiagram(subSteps));
+
+  // Tool progress tracking by subStepId
+  let toolProgressMap = $state<Record<string, ToolProgress[]>>({});
 
   // Progress steps derived from subSteps for the VerticalProgressBar
   let progressSteps = $derived<ProgressStep[]>(
@@ -114,7 +122,7 @@
   let eventsContainer: HTMLDivElement | null = null;
 
   // Tool progress tracking by subStepId
-  let toolProgressMap = $state<Record<string, ToolProgress[]>>({});
+  //let toolProgressMap = $state<Record<string, ToolProgress[]>>({});
 
   // Modal state for step details
   let selectedStep = $state<LocalSubStep | null>(null);
