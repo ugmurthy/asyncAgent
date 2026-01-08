@@ -62,6 +62,7 @@ export class FetchPageTool extends BaseTool<FetchPageInput, FetchPageOutput> {
       );
 
       if (!response.ok) {
+        ctx.emitEvent?.progress(`❌ Could not fetch: ${input.url}`);
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -70,6 +71,7 @@ export class FetchPageTool extends BaseTool<FetchPageInput, FetchPageOutput> {
       const isPdf = contentType.includes('application/pdf');
 
       if (!isHtml && !isPdf) {
+        ctx.emitEvent?.progress(`❌ Could not extract: ${input.url}`)
         throw new Error(`Unsupported content type: ${contentType}`);
       }
 
@@ -97,7 +99,7 @@ export class FetchPageTool extends BaseTool<FetchPageInput, FetchPageOutput> {
       const truncated = content.length > input.maxLength;
 
       ctx.logger.info(`╰─Fetched ${fullContent.length} chars`);
-      ctx.emitEvent?.completed(`Fetched ${fullContent.length} chars from ${input.url}`);
+      ctx.emitEvent?.completed(`🌐 Fetched ${fullContent.length} chars from ${input.url}`);
 
       return {
         url: input.url,

@@ -36,7 +36,34 @@
 
   let isSubmitting = false;
   let isEnhancing = false;
+  let isChecking = false;
   let errors: Record<string, string> = {};
+
+  async function handleCheck() {
+    if (!goalText.trim()) return;
+
+    isChecking = true;
+    try {
+      const response = await taskApi.executeTask({
+        formData: {
+          taskName: "Checker",
+          prompt: goalText.trim(),
+        },
+      });
+      if (response.response) {
+        goalText = response.response;
+        addNotification("Goal description checked", "success");
+      }
+    } catch (error: any) {
+      console.error("Failed to check goal:", error);
+      addNotification(
+        error.message || "Failed to check goal description",
+        "error"
+      );
+    } finally {
+      isChecking = false;
+    }
+  }
 
   async function handleEnhance() {
     if (!goalText.trim()) return;
@@ -230,7 +257,16 @@
             rows={5}
             class={errors.goalText ? "border-destructive" : ""}
           />
-          <div class="flex justify-end">
+          <div class="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!goalText.trim() || isChecking}
+              onclick={handleCheck}
+            >
+              {isChecking ? "Checking..." : "Check"}
+            </Button>
             <Button
               type="button"
               variant="outline"

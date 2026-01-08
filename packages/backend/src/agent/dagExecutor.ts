@@ -7,6 +7,7 @@ import { dagExecutions, subSteps, agents, type SubStep } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
 import { dagEventBus } from '../events/bus.js';
 import { LlmExecuteTool } from '../agent/tools/llmExecute.js';
+import { log } from 'node:console';
 
 export interface SubTask {
   id: string;
@@ -311,15 +312,43 @@ Respond with ONLY the expected output format. Build upon dependencies for cohere
     const tool= task.tool_or_prompt.name;
     const DEPENDENCY_PATTERN = /<Results? (?:from|of) Task (\d+)>/g
     const matches = [...String(value).matchAll(DEPENDENCY_PATTERN)];  
-
+    //logger.info(`tool : ${tool}, key: ${key}`)
     if (tool === 'fetchURLs') {
       resolvedParams[key] = this.resolveFetchURLs(task, key, taskResults, logger);
     } else if (tool === 'writeFile' && key === 'content') {
       resolvedParams[key] = this.resolveWriteFileContent(task,taskResults, logger);
+
+    } else if (tool==='sendEmail' &&  key === 'attachments') {
+      resolvedParams[key][0]['content'] = this.resolveEmailContent(task,taskResults, logger);
+ 
     } else {
       resolvedParams[key] = this.resolveStringReplacements(value, matches, key, taskResults, logger);
     }
   }
+
+private resolveEmailContent(
+  task: Record<string, any>,
+  taskResults:Map<string, any>,
+  logger:Logger ):string {
+
+  const contentArray=[]
+  for (const deps of task.dependencies) {
+    let depResult = taskResults.get(deps);
+    
+    if (typeof depResult === 'string') {
+      //logger.info(`╰─dependency reference in : Task ${deps} - content`);
+      contentArray.push(depResult)
+    } else if (typeof depResult === 'object' && depResult.content) {
+        // implies readfile results
+        // cross check path with filename of attachments
+        contentArray.push(depResult.content)
+        //logger.info(`╰─dependency reference in : Task ${deps} - attachment`)
+    }
+  } //for loop
+
+  return contentArray.join('\n');
+}
+
 
 private resolveWriteFileContent(
   task: Record<string, any>,
@@ -332,6 +361,10 @@ private resolveWriteFileContent(
     if (typeof depResult === 'string') {
       logger.info(`╰─dependency reference in : Task ${deps} - content`);
       contentArray.push(depResult)
+      } else if (typeof depResult === 'object' && depResult.content) {
+        // implies readfile results
+        contentArray.push(depResult.content)
+        logger.info(`╰─dependency reference in : Task ${deps} - content`)
       }
     }
   return contentArray.join('\n');    

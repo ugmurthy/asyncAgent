@@ -190,7 +190,7 @@ export class LlmExecuteTool extends BaseTool<LlmExecuteInput, LlmExecuteOutput> 
       });
 
       ctx.logger.debug('LLM execution completed');
-
+      ctx.emitEvent?.completed(`✨ completed`);
       return {
         content: response.content,
         usage: response.usage,

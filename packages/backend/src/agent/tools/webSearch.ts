@@ -23,6 +23,7 @@ export class WebSearchTool extends BaseTool<WebSearchInput, SearchResult[]> {
 
   async execute(input: WebSearchInput, ctx: ToolContext): Promise<SearchResult[]> {
     ctx.logger.info(` ╰─Searching web...input for ${input.query.slice(50)+'...'}`);
+    ctx.emitEvent?.progress(`🔎 for ${input.query.slice(50)+'...'}`);
     const queries = this.extractSearchQueries(input.query);
     //ctx.logger.info({queries},` ╰─Searching web...input as list`);
     const allResults: SearchResult[][] = [];
@@ -50,7 +51,7 @@ export class WebSearchTool extends BaseTool<WebSearchInput, SearchResult[]> {
         throw error;
       }
     }
-
+    ctx.emitEvent?.progress(` 🔎 Found ${allResults.flat().length} results`)
     return allResults.flat();
   }
   /**

@@ -145,7 +145,7 @@ export function registerCreateDagRoute(
         }
 
         let result;
-        log.info({ response: response.content }, 'LLM Response');
+        //log.info({ response: response.content }, 'LLM Response');
         try {
           result = extractCodeBlock(response.content);
         } catch (parseError) {

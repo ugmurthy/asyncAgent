@@ -137,7 +137,7 @@ export class SendEmailTool extends BaseTool<SendEmailInput, SendEmailOutput> {
       );
 
       ctx.logger.info(`Email sent successfully. Message ID: ${result.messageId}`);
-
+      ctx.emitEvent?.completed(`✉️ Email sent`);
       return {
         success: true,
         messageId: result.messageId,
@@ -148,7 +148,7 @@ export class SendEmailTool extends BaseTool<SendEmailInput, SendEmailOutput> {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       ctx.logger.error({ err: error }, 'Email send failed');
-
+      ctx.emitEvent?.completed(`❌ Failed to send email: ${errorMessage}`);
       return {
         success: false,
         to: input.to,

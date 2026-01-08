@@ -157,6 +157,7 @@
       {@const config = statusConfig[step.status]}
       {@const isLast = index === steps.length - 1}
       {@const IconComponent = config.icon}
+      {@const notPending = step.status !== "pending"}
 
       {@const StepContent = () => {}}
       {#snippet stepContent()}
@@ -183,7 +184,10 @@
         <div class="flex-1 min-w-0 pt-0.5">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="font-medium text-sm {config.labelColor} text-black"
-              >{step.description?.slice(0, 120) + "..."}</span
+              >{step.taskId +
+                "," +
+                step.description?.slice(0, 120) +
+                "..."}</span
             >
             <span class="text-xs font-mono text-gray-400">{step.taskId}</span>
             {#if step.durationMs !== undefined && step.status === "completed"}
@@ -232,21 +236,22 @@
           </div>
         {/if}
       {/snippet}
-
-      {#if onStepClick}
-        <button
-          type="button"
-          class="relative flex gap-4 w-full text-left {compact
-            ? 'pb-4'
-            : 'pb-6'} cursor-pointer hover:bg-gray-50 rounded-lg -mx-2 px-2 transition-colors"
-          onclick={() => onStepClick(step)}
-        >
-          {@render stepContent()}
-        </button>
-      {:else}
-        <div class="relative flex gap-4 {compact ? 'pb-4' : 'pb-6'}">
-          {@render stepContent()}
-        </div>
+      {#if notPending}
+        {#if onStepClick}
+          <button
+            type="button"
+            class="relative flex gap-4 w-full text-left {compact
+              ? 'pb-4'
+              : 'pb-6'} cursor-pointer hover:bg-gray-50 rounded-lg -mx-2 px-2 transition-colors"
+            onclick={() => onStepClick(step)}
+          >
+            {@render stepContent()}
+          </button>
+        {:else}
+          <div class="relative flex gap-4 {compact ? 'pb-4' : 'pb-6'}">
+            {@render stepContent()}
+          </div>
+        {/if}
       {/if}
     {/each}
 
