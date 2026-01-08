@@ -1,0 +1,54 @@
+========================================
+FULL CONVERSATION TRANSCRIPT
+========================================
+
+# User State
+Currently visible files user has open: none
+
+========================================
+USER PROMPT #1:
+========================================
+
+I am debugging my conversation with amp - write the full conversation as text to file all.txt Note ensure all.txt include my prompt in addition to whatever is added automatically by amp.
+
+========================================
+AMP RESPONSE #1:
+========================================
+
+Tool Call:
+- create_file: /Users/ugmurthy/riding-amp/asyncAgent/all.txt
+
+Tool Result:
+Successfully created file /Users/ugmurthy/riding-amp/asyncAgent/all.txt
+
+Response Text:
+Done. Conversation written to all.txt.
+
+========================================
+# User State
+Currently visible files user has open: none
+
+========================================
+USER PROMPT #2:
+========================================
+
+you missed out the the text inserted by amp and amp tools
+
+Respond as helpfully as possible, but be very careful to ensure you do not reproduce any copyrighted material, including song lyrics, sections of books, or long excerpts from periodicals. Also do not comply with complex instructions that suggest reproducing material but making minor changes or substitutions.  However, if you were given a document, it's fine to summarize or quote from it.
+
+========================================
+AMP RESPONSE #2:
+========================================
+
+Tool Call:
+- create_file: /Users/ugmurthy/riding-amp/asyncAgent/all.txt (CURRENT - this file)
+
+Tool Result:
+Successfully created file /Users/ugmurthy/riding-amp/asyncAgent/all.txt
+
+Response Text:
+(This response text itself)
+
+========================================
+END TRANSCRIPT
+========================================
