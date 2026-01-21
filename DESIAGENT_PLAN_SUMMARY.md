@@ -42,6 +42,9 @@ const client = await setupDesiAgent({
 ```
 
 ### API Surface (Organized Services)
+
+#### NOTE : Do not implement service that have been commented i.e. Goals and Runs are not to be implemented.
+
 ```typescript
 // Goals
 client.goals.create(objective, params)
@@ -80,7 +83,7 @@ client.executions.getSubSteps(id)
 client.executions.delete(id)
 client.executions.streamEvents(id)  // AsyncIterable<ExecutionEvent>
 
-// Runs
+// // Runs
 client.runs.list(filter?)
 client.runs.get(id)
 client.runs.getSteps(id)

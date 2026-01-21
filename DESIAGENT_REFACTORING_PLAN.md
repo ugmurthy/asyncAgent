@@ -20,6 +20,8 @@ Refactor the @async-agent/backend Fastify-based API server into a standalone, **
 | `/api/v1/goals/:id/run` | POST | Trigger goal execution | `runGoal(id)` | P0 |
 | `/api/v1/goals/:id/pause` | POST | Pause goal & schedules | `pauseGoal(id)` | P1 |
 | `/api/v1/goals/:id/resume` | POST | Resume paused goal | `resumeGoal(id)` | P1 |
+|||
+|||
 | `/api/v1/agents` | POST | Create agent | `createAgent(name, version, prompt)` | P0 |
 | `/api/v1/agents` | GET | List agents | `listAgents(filter?)` | P0 |
 | `/api/v1/agents/:id` | GET | Get agent details | `getAgent(id)` | P0 |
@@ -43,10 +45,13 @@ Refactor the @async-agent/backend Fastify-based API server into a standalone, **
 | `/api/v1/dag-executions/:id` | DELETE | Delete execution | `deleteDAGExecution(id)` | P1 |
 | `/api/v1/dag-executions/:id/sub-steps` | GET | Get sub-steps | `getDAGExecutionSubSteps(id)` | P1 |
 | `/api/v1/dag-executions/:id/events` | GET (SSE) | Stream execution events | `streamDAGExecutionEvents(id)` (Async Iterator) | P2 |
+|||
+|||
 | `/api/v1/runs` | GET | List runs | `listRuns(filter?)` | P0 |
 | `/api/v1/runs/:id` | GET | Get run details | `getRun(id)` | P0 |
 | `/api/v1/runs/:id/steps` | GET | Get run steps | `getRunSteps(id)` | P0 |
 | `/api/v1/runs/:id` | DELETE | Delete run | `deleteRun(id)` | P1 |
+|||
 | `/api/v1/tools` | GET | List available tools | `listTools(filter?)` | P0 |
 | `/api/v1/task` | POST | Execute task with agent | `executeTask(agent, task, files)` | P0 |
 | `/api/v1/artifacts` | GET | List artifacts | `listArtifacts()` | P1 |
@@ -69,6 +74,7 @@ Refactor the @async-agent/backend Fastify-based API server into a standalone, **
 - **planner.ts**: Agent thought/action planning
   - LLM-based reasoning and tool selection
   - ✅ Core library logic
+  
 - **dagExecutor.ts**: DAG decomposition and execution
   - Complex DAG validation, task execution, result synthesis
   - ✅ Core library logic

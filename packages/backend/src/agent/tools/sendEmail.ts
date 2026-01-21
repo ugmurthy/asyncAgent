@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import path from 'node:path';
 import { BaseTool } from './base.js';
 import type { ToolContext } from '@async-agent/shared';
 import nodemailer from 'nodemailer';
@@ -84,6 +85,11 @@ export class SendEmailTool extends BaseTool<SendEmailInput, SendEmailOutput> {
     return emails;
   }
 
+  private resolveAttachmentPath(filePath: string): string {
+    const artifactsDir = process.env.ARTIFACTS_DIR || './artifacts';
+    return path.resolve(artifactsDir, path.basename(filePath));
+  }
+
   async execute(input: SendEmailInput, ctx: ToolContext): Promise<SendEmailOutput> {
     ctx.logger.info(`Sending email to: ${input.to}`);
 
@@ -116,7 +122,7 @@ export class SendEmailTool extends BaseTool<SendEmailInput, SendEmailOutput> {
       if (input.attachments && input.attachments.length > 0) {
         mailOptions.attachments = input.attachments.map((att) => ({
           filename: att.filename,
-          path: att.path,
+          path: att.path ? this.resolveAttachmentPath(att.path) : undefined,
           content: att.content,
           contentType: att.contentType,
           encoding: att.encoding as 'base64' | undefined,

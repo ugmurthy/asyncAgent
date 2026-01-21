@@ -21,29 +21,35 @@
   };
 
   async function enhanceRenderedMarkdown() {
-    if (typeof window === 'undefined' || !container) return;
+    if (typeof window === "undefined" || !container) return;
 
-    const mermaidCodeBlocks = container.querySelectorAll('pre > code.language-mermaid');
+    const mermaidCodeBlocks = container.querySelectorAll(
+      "pre > code.language-mermaid"
+    );
     mermaidCodeBlocks.forEach((codeEl) => {
       const pre = codeEl.parentElement;
       if (!pre) return;
 
-      const div = document.createElement('div');
-      div.className = 'mermaid';
-      div.textContent = codeEl.textContent ?? '';
+      const div = document.createElement("div");
+      div.className = "mermaid";
+      div.textContent = codeEl.textContent ?? "";
       pre.replaceWith(div);
     });
 
     mermaid.initialize({ startOnLoad: false });
-    await mermaid.run({ querySelector: '.mermaid' });
+    await mermaid.run({ querySelector: ".mermaid" });
 
-    const { default: renderMathInElement } = await import('katex/dist/contrib/auto-render.mjs');
+    const { default: renderMathInElement } = await import(
+      "katex/dist/contrib/auto-render.mjs"
+    );
     renderMathInElement(container, {
       delimiters: [
-        { left: '$$', right: '$$', display: true },
-        { left: '\\(', right: '\\)', display: false }
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false },
+        { left: "\\(", right: "\\)", display: false },
+        { left: "\\[", right: "\\]", display: true },
       ],
-      throwOnError: false
+      throwOnError: false,
     });
   }
 

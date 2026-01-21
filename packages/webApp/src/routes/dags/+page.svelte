@@ -38,12 +38,15 @@
   $: filteredDags = data.dags
     .filter((dag) => {
       if (statusFilter !== "all" && dag.status !== statusFilter) return false;
-      const intent = getIntent(dag);
-      if (
-        searchQuery &&
-        !intent.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-        return false;
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const intent = getIntent(dag).toLowerCase();
+        const title = ((dag as any).dagTitle || "").toLowerCase();
+        const goalText = getGoalText(dag).toLowerCase();
+        if (!intent.includes(query) && !title.includes(query) && !goalText.includes(query)) {
+          return false;
+        }
+      }
       return true;
     })
     .sort((a, b) => {
@@ -227,7 +230,7 @@
   <div class="flex gap-4 items-center">
     <Input
       type="search"
-      placeholder="Search DAGs by intent..."
+      placeholder="Search DAGs..."
       bind:value={searchQuery}
       class="max-w-sm"
     />
