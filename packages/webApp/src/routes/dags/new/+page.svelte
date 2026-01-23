@@ -38,11 +38,15 @@
   let isEnhancing = false;
   let isChecking = false;
   let errors: Record<string, string> = {};
+  let clarificationQuestions: string[] = [];
+  let fulfillmentMessage: string | null = null;
 
   async function handleCheck() {
     if (!goalText.trim()) return;
 
     isChecking = true;
+    clarificationQuestions = [];
+    fulfillmentMessage = null;
     try {
       const response = await taskApi.executeTask({
         formData: {
@@ -51,8 +55,16 @@
         },
       });
       if (response.response) {
-        goalText = response.response;
-        addNotification("Goal description checked", "success");
+        const parsed = JSON.parse(response.response);
+        if (parsed.status === "needs_clarification" && parsed.questions?.length > 0) {
+          clarificationQuestions = parsed.questions;
+          addNotification("Clarification needed", "warning");
+        } else if (parsed.fulfillment) {
+          fulfillmentMessage = parsed.fulfillment;
+          addNotification("Goal description checked", "success");
+        } else {
+          addNotification("Goal description checked", "success");
+        }
       }
     } catch (error: any) {
       console.error("Failed to check goal:", error);
@@ -279,6 +291,22 @@
           </div>
           {#if errors.goalText}
             <p class="text-sm text-destructive">{errors.goalText}</p>
+          {/if}
+          {#if clarificationQuestions.length > 0}
+            <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+              <p class="text-sm font-medium text-amber-800 mb-2">Clarification needed:</p>
+              <ul class="list-disc list-inside space-y-1">
+                {#each clarificationQuestions as question}
+                  <li class="text-sm text-amber-700">{question}</li>
+                {/each}
+              </ul>
+            </div>
+          {/if}
+          {#if fulfillmentMessage}
+            <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+              <p class="text-sm font-medium text-green-800 mb-1">Goal is clear:</p>
+              <p class="text-sm text-green-700">{fulfillmentMessage}</p>
+            </div>
           {/if}
         </div>
 
