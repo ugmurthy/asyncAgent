@@ -8,7 +8,6 @@ import { env } from '../util/env.js';
 import { db, closeDatabase } from '../db/client.js';
 import { createLLMProvider, validateLLMSetup } from '../agent/providers/index.js';
 import { defaultToolRegistry } from '../agent/tools/index.js';
-import { CronScheduler } from '../scheduler/cron.js';
 import { DAGScheduler } from '../scheduler/dag-scheduler.js';
 import { agentsRoutes } from './routes/agents.js';
 import { dagRoutes } from './routes/dag.js';
@@ -46,14 +45,7 @@ await fastify.register(multipart, {
 const llmProvider = createLLMProvider();
 await validateLLMSetup(llmProvider, env.LLM_MODEL);
 
-// Initialize schedulers
-const scheduler = new CronScheduler({
-  db,
-  logger,
-  llmProvider,
-  toolRegistry: defaultToolRegistry,
-});
-
+// Initialize DAG scheduler
 const dagScheduler = new DAGScheduler({
   db,
   logger,
@@ -71,7 +63,6 @@ fastify.get('/health/ready', async () => {
     status: 'ready',
     provider: env.LLM_PROVIDER,
     model: env.LLM_MODEL,
-    scheduler: scheduler.getStats(),
     dagScheduler: dagScheduler.getStats(),
     timestamp: new Date().toISOString(),
   };
@@ -93,14 +84,12 @@ const start = async () => {
     // Seed default agent
     await seedDefaultAgent();
     
-    // Start schedulers
-    await scheduler.start();
+    // Start DAG scheduler
     await dagScheduler.start();
     
     await fastify.listen({ port, host });
     logger.info(`Server listening on ${host}:${port}`);
     logger.info(`LLM Provider: ${env.LLM_PROVIDER} (${env.LLM_MODEL})`);
-    logger.info(`Scheduler: ${scheduler.getStats().activeSchedules} active schedules`);
     logger.info(`DAG Scheduler: ${dagScheduler.getStats().activeSchedules} active schedules`);
   } catch (err) {
     logger.error({ err }, 'Failed to start server');
@@ -114,8 +103,7 @@ signals.forEach((signal) => {
   process.on(signal, async () => {
     logger.info(`Received ${signal}, shutting down gracefully...`);
     
-    // Stop schedulers
-    await scheduler.stop();
+    // Stop DAG scheduler
     await dagScheduler.stop();
     
     // Close server
