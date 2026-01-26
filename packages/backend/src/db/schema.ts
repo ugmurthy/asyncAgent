@@ -11,40 +11,6 @@ export const schedules = sqliteTable('schedules', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
-export const runs = sqliteTable('runs', {
-  id: text('id').primaryKey(),
-  goalId: text('goal_id').notNull(),
-  status: text('status', { enum: ['pending', 'running', 'completed', 'failed'] }).notNull().default(sql`'pending'`),
-  startedAt: integer('started_at', { mode: 'timestamp' }),
-  endedAt: integer('ended_at', { mode: 'timestamp' }),
-  workingMemory: text('working_memory', { mode: 'json' }).notNull().$type<Record<string, any>>().default(sql`'{}'`),
-  stepBudget: integer('step_budget').notNull(),
-  stepsExecuted: integer('steps_executed').notNull().default(0),
-  error: text('error'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
-});
-
-export const steps = sqliteTable('steps', {
-  id: text('id').primaryKey(),
-  runId: text('run_id').notNull().references(() => runs.id, { onDelete: 'cascade' }),
-  stepNo: integer('step_no').notNull(),
-  thought: text('thought').notNull(),
-  toolName: text('tool_name'),
-  toolInput: text('tool_input', { mode: 'json' }).$type<Record<string, any>>(),
-  observation: text('observation'),
-  durationMs: integer('duration_ms').notNull(),
-  error: text('error'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
-});
-
-export const outputs = sqliteTable('outputs', {
-  id: text('id').primaryKey(),
-  runId: text('run_id').notNull().references(() => runs.id, { onDelete: 'cascade' }),
-  kind: text('kind', { enum: ['summary', 'file', 'webhook', 'email'] }).notNull(),
-  pathOrPayload: text('path_or_payload').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
-});
-
 export const agents = sqliteTable('agents', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -213,12 +179,6 @@ export const executions = sqliteView('executions', {
 
 export type Schedule = typeof schedules.$inferSelect;
 export type NewSchedule = typeof schedules.$inferInsert;
-export type Run = typeof runs.$inferSelect;
-export type NewRun = typeof runs.$inferInsert;
-export type Step = typeof steps.$inferSelect;
-export type NewStep = typeof steps.$inferInsert;
-export type Output = typeof outputs.$inferSelect;
-export type NewOutput = typeof outputs.$inferInsert;
 export type Agent = typeof agents.$inferSelect;
 export type NewAgent = typeof agents.$inferInsert;
 export type Dag = typeof dags.$inferSelect;
@@ -230,25 +190,6 @@ export type NewSubStep = typeof subSteps.$inferInsert;
 export type Execution = typeof executions.$inferSelect;
 
 // Relations
-
-export const runsRelations = relations(runs, ({ many }) => ({
-  steps: many(steps),
-  outputs: many(outputs),
-}));
-
-export const stepsRelations = relations(steps, ({ one }) => ({
-  run: one(runs, {
-    fields: [steps.runId],
-    references: [runs.id],
-  }),
-}));
-
-export const outputsRelations = relations(outputs, ({ one }) => ({
-  run: one(runs, {
-    fields: [outputs.runId],
-    references: [runs.id],
-  }),
-}));
 
 export const agentsRelations = relations(agents, ({ }) => ({
 }));

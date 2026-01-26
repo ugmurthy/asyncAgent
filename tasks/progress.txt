@@ -3,6 +3,7 @@
 ## Codebase Patterns
 - Route registration in server.ts uses `fastify.register(routeHandler, { prefix: '/api/v1', ...options })`
 - Routes can accept additional options like `scheduler` or `llmProvider` passed during registration
+- When removing schema tables with FK relationships, also update dependent tables and relations
 
 ---
 
@@ -25,5 +26,21 @@ Thread: https://ampcode.com/threads/T-019bf9ee-66f9-709f-902f-3c59b5d28e3c
 - **Learnings for future iterations:**
   - runs.ts had references to `runs`, `steps` from schema and `goal` relation - these will be removed in US-003/US-004
   - Straightforward route removal - no dependencies beyond the route file and its registration
+---
+
+## 2026-01-26 - US-003
+Thread: https://ampcode.com/threads/T-019bf9ef-9817-728f-b19f-ae0bfa5d3fa9
+- Removed `goals` table definition from schema.ts
+- Removed `memories` table definition from schema.ts
+- Removed Goal, NewGoal, Memory, NewMemory type exports
+- Removed goalsRelations and memoriesRelations
+- Also removed `goals` FK reference from `runs.goalId` (runs table still exists, will be removed in US-004)
+- Fixed cron.ts import to not import non-existent `goals`
+- **Files changed:** schema.ts (modified), cron.ts (modified)
+- **Learnings for future iterations:**
+  - Runs table had FK to goals - needed to remove FK but keep column for US-004 to clean up
+  - runsRelations had `goal` relation that needed removal
+  - agentsRelations had `goals: many(goals)` that needed removal
+  - cron.ts imports schema tables - will be fully removed in US-007
 ---
 
