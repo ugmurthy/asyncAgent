@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 
 export const schedules = sqliteTable('schedules', {
   id: text('id').primaryKey(),
+  dagId: text('dag_id').notNull().references(() => dags.id, { onDelete: 'cascade' }),
   cronExpr: text('cron_expr').notNull(),
   timezone: text('timezone').notNull().default('UTC'),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
@@ -207,4 +208,16 @@ export const subStepsRelations = relations(subSteps, ({ one }) => ({
     fields: [subSteps.executionId],
     references: [dagExecutions.id],
   }),
+}));
+
+export const schedulesRelations = relations(schedules, ({ one }) => ({
+  dag: one(dags, {
+    fields: [schedules.dagId],
+    references: [dags.id],
+  }),
+}));
+
+export const dagsRelations = relations(dags, ({ many }) => ({
+  executions: many(dagExecutions),
+  schedules: many(schedules),
 }));
