@@ -82,3 +82,15 @@ Thread: https://ampcode.com/threads/T-019bf9f6-1e11-743b-b0cd-99292f81a4f8
   - The stub approach in US-004 made this deletion trivial - no remaining imports to clean up
 ---
 
+## 2026-01-26 - US-007
+Thread: https://ampcode.com/threads/T-019bf9f6-1e11-743b-b0cd-99292f81a4f8
+- Deleted packages/backend/src/scheduler/cron.ts
+- Removed CronScheduler import from server.ts
+- Removed scheduler instantiation, /health/ready stats, start/stop calls, and startup logging
+- DAGScheduler remains as the sole scheduler
+- **Files changed:** cron.ts (deleted), server.ts (modified)
+- **Learnings for future iterations:**
+  - The stub in US-004 made cleanup easier - server.ts just needed reference removal
+  - DAGScheduler has the same interface pattern (start/stop/getStats) so refactoring was straightforward
+---
+
