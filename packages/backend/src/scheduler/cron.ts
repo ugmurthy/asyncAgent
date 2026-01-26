@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import parser from 'cron-parser';
 import type { Database } from '../db/client.js';
 import type { Logger } from '../util/logger.js';
-import { schedules, runs, goals } from '../db/schema.js';
+import { schedules, runs } from '../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
 import { generateRunId } from '@async-agent/shared';
 import { TaskQueue } from './queue.js';
