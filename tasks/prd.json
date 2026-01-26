@@ -1,0 +1,244 @@
+{
+  "project": "AsyncAgent",
+  "branchName": "ralph/remove-goals-runs",
+  "description": "Remove Goals and Runs Management - Refactor backend to remove goal/run functionality and repurpose schedules for DAG",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Remove Goals Routes",
+      "description": "As a developer, I want to remove the goals route file and its registration so that the Goals API is no longer exposed.",
+      "acceptanceCriteria": [
+        "Delete packages/backend/src/app/routes/goals.ts",
+        "Remove goalsRoutes import from server.ts",
+        "Remove goalsRoutes registration from server.ts",
+        "Remove scheduler parameter from route registration",
+        "Typecheck passes (pnpm --filter backend build)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Remove Runs Routes",
+      "description": "As a developer, I want to remove the runs route file and its registration so that the Runs API is no longer exposed.",
+      "acceptanceCriteria": [
+        "Delete packages/backend/src/app/routes/runs.ts",
+        "Remove runsRoutes import from server.ts",
+        "Remove runsRoutes registration from server.ts",
+        "Typecheck passes (pnpm --filter backend build)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Remove goals and memories tables from schema",
+      "description": "As a developer, I want to remove the goals and memories tables from the database schema.",
+      "acceptanceCriteria": [
+        "Remove goals table definition from packages/backend/src/db/schema.ts",
+        "Remove memories table definition from schema.ts",
+        "Remove Goal, NewGoal, Memory, NewMemory type exports",
+        "Remove goalsRelations and memoriesRelations",
+        "Typecheck passes (pnpm --filter backend build)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Remove runs, steps, outputs tables from schema",
+      "description": "As a developer, I want to remove the runs, steps, and outputs tables from the database schema.",
+      "acceptanceCriteria": [
+        "Remove runs table definition from packages/backend/src/db/schema.ts",
+        "Remove steps table definition from schema.ts",
+        "Remove outputs table definition from schema.ts",
+        "Remove Run, NewRun, Step, NewStep, Output, NewOutput type exports",
+        "Remove runsRelations, stepsRelations, outputsRelations",
+        "Typecheck passes (pnpm --filter backend build)"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Update schedules table to reference DAGs",
+      "description": "As a developer, I want to modify the schedules table to support DAG scheduling instead of goal scheduling.",
+      "acceptanceCriteria": [
+        "Remove goalId foreign key from schedules table in schema.ts",
+        "Add dagId foreign key referencing dags.id with onDelete cascade",
+        "Update schedulesRelations to reference dags instead of goals",
+        "Update Schedule type export if needed",
+        "Typecheck passes (pnpm --filter backend build)"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Remove AgentOrchestrator",
+      "description": "As a developer, I want to remove the AgentOrchestrator class entirely since it's no longer needed.",
+      "acceptanceCriteria": [
+        "Delete packages/backend/src/agent/orchestrator.ts",
+        "Remove any imports of AgentOrchestrator from other files (check cron.ts)",
+        "Typecheck passes (pnpm --filter backend build)"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Remove CronScheduler and update server",
+      "description": "As a developer, I want to remove CronScheduler and update server.ts to use only DAGScheduler.",
+      "acceptanceCriteria": [
+        "Delete packages/backend/src/scheduler/cron.ts",
+        "Remove CronScheduler import from server.ts",
+        "Remove scheduler instantiation from server.ts",
+        "Remove scheduler from /health/ready endpoint stats",
+        "Remove scheduler.start() and scheduler.stop() calls",
+        "Remove scheduler logging from startup",
+        "Keep DAGScheduler as the sole scheduler",
+        "Typecheck passes (pnpm --filter backend build)"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Clean up shared package goal/run schemas",
+      "description": "As a developer, I want to remove goal/run-related schemas and utilities from the shared package.",
+      "acceptanceCriteria": [
+        "Search shared package for createGoalSchema, updateGoalSchema, goalParamsSchema",
+        "Remove or deprecate unused goal/run schemas",
+        "Remove generateGoalId if no longer used elsewhere",
+        "Remove generateRunId if no longer used elsewhere",
+        "Typecheck passes (pnpm build)"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Update OpenAPI spec - remove goals endpoints",
+      "description": "As a developer, I want to remove goals endpoints from the OpenAPI specification.",
+      "acceptanceCriteria": [
+        "Remove POST /api/v1/goals endpoint from openapi.yaml",
+        "Remove GET /api/v1/goals endpoint from openapi.yaml",
+        "Remove GET /api/v1/goals/{id} endpoint from openapi.yaml",
+        "Remove PATCH /api/v1/goals/{id} endpoint from openapi.yaml",
+        "Remove DELETE /api/v1/goals/{id} endpoint from openapi.yaml",
+        "Remove POST /api/v1/goals/{id}/run endpoint from openapi.yaml",
+        "Remove POST /api/v1/goals/{id}/pause endpoint from openapi.yaml",
+        "Remove POST /api/v1/goals/{id}/resume endpoint from openapi.yaml",
+        "Remove Goal-related request/response schemas from openapi.yaml"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Update OpenAPI spec - remove runs endpoints",
+      "description": "As a developer, I want to remove runs endpoints from the OpenAPI specification.",
+      "acceptanceCriteria": [
+        "Remove GET /api/v1/runs endpoint from openapi.yaml",
+        "Remove GET /api/v1/runs/{id} endpoint from openapi.yaml",
+        "Remove GET /api/v1/runs/{id}/steps endpoint from openapi.yaml",
+        "Remove DELETE /api/v1/runs/{id} endpoint from openapi.yaml",
+        "Remove Run-related request/response schemas from openapi.yaml"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Regenerate API clients",
+      "description": "As a developer, I want to regenerate the API clients after OpenAPI changes.",
+      "acceptanceCriteria": [
+        "Run pnpm generate to regenerate JS and Python API clients",
+        "Verify generated clients match spec with pnpm test:check-generate",
+        "Typecheck passes (pnpm build)"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Update backend AGENTS.md documentation",
+      "description": "As a developer, I want to update the backend AGENTS.md to reflect removed functionality.",
+      "acceptanceCriteria": [
+        "Remove Goals Management section from packages/backend/AGENTS.md",
+        "Remove Runs Management section from packages/backend/AGENTS.md",
+        "Update Database Schema section to remove goals, runs, steps, memories, outputs tables",
+        "Update schedules table documentation to show dagId reference"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Update root AGENTS.md documentation",
+      "description": "As a developer, I want to update the root AGENTS.md if it references goals/runs.",
+      "acceptanceCriteria": [
+        "Check root AGENTS.md for any references to goals or runs",
+        "Remove or update any goal/run references found",
+        "Ensure API documentation section reflects current endpoints"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Remove goal/run related tests",
+      "description": "As a developer, I want to remove tests related to goals and runs.",
+      "acceptanceCriteria": [
+        "Delete packages/backend/src/__tests__/integration/goal-workflow.test.ts",
+        "Search for and remove any other goal/run related test files",
+        "Ensure remaining tests pass: pnpm --filter backend test"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Generate and apply database migration",
+      "description": "As a developer, I want to generate and apply database migrations for schema changes.",
+      "acceptanceCriteria": [
+        "Run pnpm --filter backend db:generate to generate migration",
+        "Run pnpm --filter backend db:push to apply schema changes",
+        "Verify database schema reflects changes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Final verification",
+      "description": "As a developer, I want to verify the refactoring is complete with no regressions.",
+      "acceptanceCriteria": [
+        "Full build passes: pnpm build",
+        "All tests pass: pnpm test",
+        "Lint passes: pnpm lint",
+        "Backend starts successfully: pnpm --filter backend dev",
+        "Health endpoints respond correctly",
+        "No references to goals, runs, steps, memories, outputs in codebase (except migrations)"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

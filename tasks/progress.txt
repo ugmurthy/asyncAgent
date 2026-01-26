@@ -1,0 +1,7 @@
+# Progress Log - Remove Goals and Runs Management
+
+## Codebase Patterns
+(Patterns discovered during implementation will be added here)
+
+---
+

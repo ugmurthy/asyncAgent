@@ -10,7 +10,6 @@ import { createLLMProvider, validateLLMSetup } from '../agent/providers/index.js
 import { defaultToolRegistry } from '../agent/tools/index.js';
 import { CronScheduler } from '../scheduler/cron.js';
 import { DAGScheduler } from '../scheduler/dag-scheduler.js';
-import { goalsRoutes } from './routes/goals.js';
 import { runsRoutes } from './routes/runs.js';
 import { agentsRoutes } from './routes/agents.js';
 import { dagRoutes } from './routes/dag.js';
@@ -81,7 +80,6 @@ fastify.get('/health/ready', async () => {
 
 // Register routes
 await fastify.register(agentsRoutes, { prefix: '/api/v1' });
-await fastify.register(goalsRoutes, { prefix: '/api/v1', scheduler });
 await fastify.register(runsRoutes, { prefix: '/api/v1' });
 await fastify.register(dagRoutes, { prefix: '/api/v1', llmProvider, toolRegistry: defaultToolRegistry, dagScheduler });
 await fastify.register(toolsRoutes, { prefix: '/api/v1', toolRegistry: defaultToolRegistry });
