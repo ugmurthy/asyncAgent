@@ -29,7 +29,7 @@
         "Typecheck passes (pnpm --filter backend build)"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

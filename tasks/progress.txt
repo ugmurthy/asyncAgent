@@ -17,3 +17,13 @@ Thread: https://ampcode.com/threads/T-019bf9ba-37fd-72e0-8695-47750f5ef56f
   - The scheduler variable is still used elsewhere (health/ready, start, stop) - will be cleaned up later
 ---
 
+## 2026-01-26 - US-002
+Thread: https://ampcode.com/threads/T-019bf9ee-66f9-709f-902f-3c59b5d28e3c
+- Deleted packages/backend/src/app/routes/runs.ts
+- Removed runsRoutes import and registration from server.ts
+- **Files changed:** runs.ts (deleted), server.ts (modified)
+- **Learnings for future iterations:**
+  - runs.ts had references to `runs`, `steps` from schema and `goal` relation - these will be removed in US-003/US-004
+  - Straightforward route removal - no dependencies beyond the route file and its registration
+---
+
