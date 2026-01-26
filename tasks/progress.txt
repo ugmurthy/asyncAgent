@@ -61,3 +61,15 @@ Thread: https://ampcode.com/threads/T-019bf9f2-8cd9-7221-82e9-189e08e34187
   - Stubs include deprecation comments and throw/warn when called
 ---
 
+## 2026-01-26 - US-005
+Thread: https://ampcode.com/threads/T-019bf9f6-1e11-743b-b0cd-99292f81a4f8
+- Added `dagId` foreign key to schedules table with `onDelete: 'cascade'`
+- Added `schedulesRelations` to define relationship to dags
+- Added `dagsRelations` to define relationships to dagExecutions and schedules
+- goalId was already absent from schedules (removed in earlier work)
+- **Files changed:** schema.ts (modified)
+- **Learnings for future iterations:**
+  - The schedules table had no goalId FK (already cleaned up) - just needed dagId added
+  - Added dagsRelations for completeness, including both executions and schedules relationships
+---
+
