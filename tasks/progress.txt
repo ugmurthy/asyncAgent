@@ -1,7 +1,19 @@
 # Progress Log - Remove Goals and Runs Management
 
 ## Codebase Patterns
-(Patterns discovered during implementation will be added here)
+- Route registration in server.ts uses `fastify.register(routeHandler, { prefix: '/api/v1', ...options })`
+- Routes can accept additional options like `scheduler` or `llmProvider` passed during registration
 
+---
+
+## 2026-01-26 - US-001
+Thread: https://ampcode.com/threads/T-019bf9ba-37fd-72e0-8695-47750f5ef56f
+- Deleted packages/backend/src/app/routes/goals.ts
+- Removed goalsRoutes import and registration from server.ts
+- The scheduler parameter was only used by goalsRoutes, so removing the route also removes that dependency
+- **Files changed:** goals.ts (deleted), server.ts (modified)
+- **Learnings for future iterations:**
+  - CronScheduler is still instantiated in server.ts but will be removed in US-007
+  - The scheduler variable is still used elsewhere (health/ready, start, stop) - will be cleaned up later
 ---
 
