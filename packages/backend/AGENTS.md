@@ -75,6 +75,7 @@ pnpm clean
 Create a `.env` file in the **project root** directory (not in packages/backend):
 
 ### OpenAI Configuration
+
 ```bash
 LLM_PROVIDER=openai
 OPENAI_API_KEY=sk-your-key-here
@@ -86,6 +87,7 @@ LOG_LEVEL=info
 ```
 
 ### OpenRouter Configuration
+
 ```bash
 LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=sk-or-your-key-here
@@ -97,6 +99,7 @@ LOG_LEVEL=info
 ```
 
 ### Ollama Configuration
+
 ```bash
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434
@@ -108,6 +111,7 @@ LOG_LEVEL=info
 ```
 
 **Important**: Ensure Ollama is running:
+
 ```bash
 ollama serve
 ollama pull mistral
@@ -122,7 +126,6 @@ backend/
 │   │   ├── server.ts          # Main server entry point
 │   │   └── routes/            # API route handlers
 │   ├── agent/
-│   │   ├── orchestrator.ts    # Agent orchestration
 │   │   ├── planner.ts         # Task planning
 │   │   ├── dagExecutor.ts     # DAG execution engine
 │   │   ├── tools/             # Tool definitions
@@ -133,7 +136,7 @@ backend/
 │   ├── events/
 │   │   └── bus.ts             # Event bus
 │   ├── scheduler/
-│   │   └── cron-scheduler.ts  # Cron job scheduler
+│   │   └── dag-scheduler.ts   # DAG cron scheduler
 │   └── util/
 │       ├── env.ts             # Environment variables
 │       └── logger.ts          # Logger configuration
@@ -153,24 +156,6 @@ Base URL: `http://localhost:3000/api/v1`
 
 - `GET /health` - Basic health check
 - `GET /health/ready` - Detailed readiness with LLM and scheduler status
-
-### Goals Management
-
-- `POST /api/v1/goals` - Create a new goal
-- `GET /api/v1/goals` - List all goals (optional `?status=` filter)
-- `GET /api/v1/goals/:id` - Get goal details with schedules
-- `PATCH /api/v1/goals/:id` - Update goal properties
-- `DELETE /api/v1/goals/:id` - Delete goal and associated data
-- `POST /api/v1/goals/:id/run` - Manually trigger goal execution
-- `POST /api/v1/goals/:id/pause` - Pause a goal and deactivate its schedules
-- `POST /api/v1/goals/:id/resume` - Resume a paused goal
-
-### Runs Management
-
-- `GET /api/v1/runs` - List all runs (optional `?status=` and `?goalId=` filters)
-- `GET /api/v1/runs/:id` - Get run details
-- `GET /api/v1/runs/:id/steps` - Get execution steps for a run
-- `DELETE /api/v1/runs/:id` - Delete a run
 
 ### Agents
 
@@ -221,13 +206,12 @@ See [../../openapi.yaml](../../openapi.yaml) for complete API specification.
 
 Uses Drizzle ORM with SQLite for persistence:
 
-- **goals** - Goal definitions and configurations
-- **schedules** - Cron schedules for goals
-- **runs** - Execution runs and their status
-- **steps** - Individual execution steps within runs
 - **agents** - Agent configurations
-- **memories** - Agent memory entries
-- **outputs** - Run output artifacts
+- **dags** - DAG definitions
+- **dag_executions** - DAG execution instances
+- **sub_steps** - Individual steps within DAG executions
+- **schedules** - Cron schedules for DAGs (references dags.id)
+- **artifacts** - File artifacts generated during execution
 
 ## Development Workflow
 
@@ -257,11 +241,11 @@ Uses Drizzle ORM with SQLite for persistence:
 Uses Pino for structured logging:
 
 ```typescript
-import { logger } from './util/logger.js';
+import { logger } from "./util/logger.js";
 
-logger.info('Message');
-logger.error({ err, context }, 'Error occurred');
-logger.debug({ data }, 'Debug info');
+logger.info("Message");
+logger.error({ err, context }, "Error occurred");
+logger.debug({ data }, "Debug info");
 ```
 
 **Never use `console.log()`** - always use the logger.
@@ -274,8 +258,8 @@ All routes should use proper error handling:
 try {
   // Route logic
 } catch (error) {
-  logger.error({ error }, 'Operation failed');
-  return reply.code(500).send({ error: 'Internal server error' });
+  logger.error({ error }, "Operation failed");
+  return reply.code(500).send({ error: "Internal server error" });
 }
 ```
 
@@ -296,24 +280,29 @@ pnpm test:coverage
 ## Common Issues
 
 ### Port Already in Use
+
 Change `PORT` in `.env` file
 
 ### Database Locked
+
 - Stop all running backend instances
 - Delete `data/*.db-wal` and `data/*.db-shm` files if needed
 
 ### LLM Provider Errors
+
 - Verify API key is valid and has sufficient credits
 - For Ollama: ensure `ollama serve` is running
 - Check model name matches available models
 
 ### Hot Reload Not Working
+
 - Ensure using `pnpm dev` not `pnpm start`
 - Check for TypeScript compilation errors
 
 ## Dependencies
 
 ### Core
+
 - **fastify** - Web framework
 - **drizzle-orm** - Database ORM
 - **better-sqlite3** - SQLite driver
@@ -322,6 +311,7 @@ Change `PORT` in `.env` file
 - **node-cron** - Cron scheduler
 
 ### Tools
+
 - **tsx** - TypeScript execution
 - **tsup** - Build tool
 - **vitest** - Testing framework
@@ -330,6 +320,7 @@ Change `PORT` in `.env` file
 ## Production Deployment
 
 1. Build the application:
+
    ```bash
    pnpm build
    ```
@@ -337,6 +328,7 @@ Change `PORT` in `.env` file
 2. Set environment variables in production
 
 3. Start the server:
+
    ```bash
    NODE_ENV=production pnpm start
    ```
