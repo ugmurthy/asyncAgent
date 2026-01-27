@@ -10,9 +10,16 @@ describe('validateEnv', () => {
   })
 
   it('should validate environment with default values', () => {
+    delete process.env.LLM_PROVIDER
+    delete process.env.PORT
+    delete process.env.HOST
+    delete process.env.DATABASE_PATH
+    delete process.env.DEFAULT_STEP_BUDGET
+    delete process.env.LOG_LEVEL
+    
     const env = validateEnv()
     
-    expect(env.LLM_PROVIDER).toBe('openai')
+    expect(env.LLM_PROVIDER).toBe('ollama')
     expect(env.PORT).toBe('3000')
     expect(env.HOST).toBe('0.0.0.0')
     expect(['development', 'test']).toContain(env.NODE_ENV)
