@@ -163,3 +163,16 @@ Thread: https://ampcode.com/threads/T-019bfd60-718c-77c8-8613-fc6e1beb9ce4
   - test:check-generate runs generate and verifies no git diff - useful for CI
 ---
 
+
+## 2026-01-27 - US-012
+Thread: https://ampcode.com/threads/T-019bfe2b-e448-77b7-9760-9d7ac2e0b46d
+- Updated packages/backend/AGENTS.md to reflect removed functionality:
+  - Removed orchestrator.ts from Project Structure (deleted in US-006)
+  - Changed cron-scheduler.ts to dag-scheduler.ts in Project Structure
+  - Updated Database Schema: schedules now references DAGs instead of goals
+  - Reordered tables list to be more logical (agents, dags, dag_executions, sub_steps, schedules, artifacts)
+- **Files changed:** packages/backend/AGENTS.md (modified)
+- **Learnings for future iterations:**
+  - No explicit "Goals Management" or "Runs Management" sections existed - the goal/run references were in other sections
+  - Project structure documentation should be kept in sync with actual file deletions
+---

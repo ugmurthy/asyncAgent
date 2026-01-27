@@ -182,8 +182,8 @@
         "Update schedules table documentation to show dagId reference"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Removed orchestrator.ts from project structure, updated cron-scheduler.ts to dag-scheduler.ts, updated schedules description to reference DAGs instead of goals"
     },
     {
       "id": "US-013",
@@ -195,7 +195,7 @@
         "Ensure API documentation section reflects current endpoints"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -208,7 +208,7 @@
         "Ensure remaining tests pass: pnpm --filter backend test"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -221,7 +221,7 @@
         "Verify database schema reflects changes"
       ],
       "priority": 15,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
