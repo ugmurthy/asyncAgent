@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import os
 
-VERSION = "0.1.0"
+VERSION = "0.4.0"
 
 setup(
     name="async-agent-client",

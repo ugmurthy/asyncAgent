@@ -36,6 +36,9 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Command to use for openapi-python-client
+OPENAPI_PYTHON_CLIENT_CMD=""
+
 # Check if required tools are installed
 check_dependencies() {
     log_info "Checking dependencies..."
@@ -45,8 +48,14 @@ check_dependencies() {
         exit 1
     fi
     
-    if ! command -v openapi-python-client &> /dev/null; then
-        log_error "openapi-python-client is not installed. Install it with: pip install openapi-python-client"
+    # Check for openapi-python-client, fall back to uvx if available
+    if command -v openapi-python-client &> /dev/null; then
+        OPENAPI_PYTHON_CLIENT_CMD="openapi-python-client"
+    elif command -v uvx &> /dev/null; then
+        log_info "Using uvx to run openapi-python-client"
+        OPENAPI_PYTHON_CLIENT_CMD="uvx openapi-python-client"
+    else
+        log_error "openapi-python-client is not installed. Install it with: pip install openapi-python-client (or install uvx)"
         exit 1
     fi
 }
@@ -105,7 +114,7 @@ generate_client() {
     log_info "Running openapi-python-client..."
     
     cd "${CLIENT_DIR}"
-    openapi-python-client generate \
+    ${OPENAPI_PYTHON_CLIENT_CMD} generate \
         --path "${OPENAPI_SPEC}" \
         --config .openapi-python-client.yaml \
         --meta none
