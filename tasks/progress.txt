@@ -176,3 +176,25 @@ Thread: https://ampcode.com/threads/T-019bfe2b-e448-77b7-9760-9d7ac2e0b46d
   - No explicit "Goals Management" or "Runs Management" sections existed - the goal/run references were in other sections
   - Project structure documentation should be kept in sync with actual file deletions
 ---
+
+## 2026-01-27 - US-016
+Thread: https://ampcode.com/threads/T-019bfe2d-7cd2-713a-aaa8-c21211615898
+- Final verification of refactoring
+- Removed obsolete goal/run API tests from js-client/tests/client.test.ts
+- Fixed env.test.ts to properly test defaults by clearing env vars before test
+- Fixed expected LLM_PROVIDER default value (ollama, not openai) - test was outdated
+- Deleted goal-workflow.test.ts (was deleted in US-014 but not staged)
+- **Verification results:**
+  - pnpm build: ✓ passes
+  - pnpm test: ✓ all tests pass (12 tests across 4 files)
+  - pnpm lint: ✓ no lint script defined, passes
+  - Backend starts: ✓ successfully on port 3000
+  - Health endpoints: ✓ /health and /health/ready respond correctly
+- **Files changed:**
+  - packages/shared/js-client/tests/client.test.ts (removed Goals/Runs API tests)
+  - packages/backend/src/util/__tests__/env.test.ts (fixed default value test)
+  - packages/backend/src/__tests__/integration/goal-workflow.test.ts (deleted)
+- **Learnings for future iterations:**
+  - WebApp still has legacy goals/runs UI pages that can be removed in a future cleanup task
+  - The env.ts default for LLM_PROVIDER is 'ollama', not 'openai' - tests should match actual defaults
+---
