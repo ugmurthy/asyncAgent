@@ -5,6 +5,8 @@
 - Routes can accept additional options like `scheduler` or `llmProvider` passed during registration
 - When removing schema tables with FK relationships, also update dependent tables and relations
 - When removing schema tables used by files slated for later removal, stub out those files to pass typecheck
+- Empty TypeScript barrel files need `export {}` to be valid modules
+- When removing OpenAPI schemas, check for $ref dependencies - use `deprecated: true` for schemas that must remain temporarily
 
 ---
 
@@ -92,5 +94,38 @@ Thread: https://ampcode.com/threads/T-019bf9f6-1e11-743b-b0cd-99292f81a4f8
 - **Learnings for future iterations:**
   - The stub in US-004 made cleanup easier - server.ts just needed reference removal
   - DAGScheduler has the same interface pattern (start/stop/getStats) so refactoring was straightforward
+---
+
+## 2026-01-26 - US-008
+Thread: https://ampcode.com/threads/T-019bfa17-5d93-724c-811c-00fa2febb84b
+- Deleted packages/shared/src/schemas/goal.ts
+- Updated packages/shared/src/schemas/index.ts to be empty module (was re-exporting goal.ts)
+- Removed generateGoalId, generateRunId, generateStepId from id.ts (only generateId remains)
+- **Files changed:** goal.ts (deleted), schemas/index.ts (modified), utils/id.ts (modified)
+- **Learnings for future iterations:**
+  - Empty index.ts files need `export {}` to be valid TypeScript modules
+  - CLI package has goal commands importing from shared - may need cleanup in future
+  - js-client has Goal services that are auto-generated and will be regenerated in US-011
+---
+
+## 2026-01-27 - US-009
+Thread: https://ampcode.com/threads/T-019bfd56-ab19-7498-97a4-3c8797c273ab
+- Removed all goals endpoints from openapi.yaml:
+  - /api/v1/goals (GET, POST)
+  - /api/v1/goals/{id} (GET, PATCH, DELETE)
+  - /api/v1/goals/{id}/run (POST)
+  - /api/v1/goals/{id}/pause (POST)
+  - /api/v1/goals/{id}/resume (POST)
+- Removed goals tag from tags section
+- Removed GoalId and GoalStatusQuery parameters
+- Removed GoalStatus, GoalParams, Schedule, GoalWithSchedules schemas
+- Removed CreateGoalRequest, UpdateGoalRequest, TriggerRunResponse schemas
+- Kept minimal deprecated Goal schema for RunWithGoal reference (runs will be removed in US-010)
+- Updated API version to 0.4.0 and description to reflect DAG-focused API
+- **Files changed:** openapi.yaml (modified)
+- **Learnings for future iterations:**
+  - RunWithGoal references Goal schema, so Goal must remain until runs are removed in US-010
+  - Used deprecated: true marker to indicate schema is pending removal
+  - OpenAPI editing requires careful tracking of $ref dependencies between schemas
 ---
 

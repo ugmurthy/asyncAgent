@@ -121,7 +121,7 @@
         "Typecheck passes (pnpm build)"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -140,8 +140,8 @@
         "Remove Goal-related request/response schemas from openapi.yaml"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Kept a minimal deprecated Goal schema for RunWithGoal reference - will be fully removed in US-010 with runs"
     },
     {
       "id": "US-010",
