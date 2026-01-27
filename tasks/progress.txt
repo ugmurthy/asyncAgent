@@ -7,6 +7,8 @@
 - When removing schema tables used by files slated for later removal, stub out those files to pass typecheck
 - Empty TypeScript barrel files need `export {}` to be valid modules
 - When removing OpenAPI schemas, check for $ref dependencies - use `deprecated: true` for schemas that must remain temporarily
+- REPL package (packages/repl) depends on js-client - update REPL commands when removing API endpoints
+- Use `uvx openapi-python-client` if openapi-python-client is not installed globally
 
 ---
 
@@ -141,5 +143,23 @@ Thread: https://ampcode.com/threads/T-019bfd5e-bcc2-76f2-9b67-2cb2805e4f08
 - **Learnings for future iterations:**
   - With runs gone, all goal/run-related schemas can be fully removed
   - OpenAPI file is now ~1070 lines shorter after removing goals+runs
+---
+
+## 2026-01-27 - US-011
+Thread: https://ampcode.com/threads/T-019bfd60-718c-77c8-8613-fc6e1beb9ce4
+- Regenerated JS and Python API clients using `pnpm generate`
+- Updated scripts/generate-python-client.sh to use `uvx openapi-python-client` as fallback when `openapi-python-client` is not installed
+- Removed goal/run commands from packages/repl/src/commands.ts (was using removed API client services)
+- Removed unused `findAllValuesByKey` helper function and lodash import from commands.ts
+- All Goal/Run models and services deleted from js-client (27 files changed, 995 lines removed)
+- **Files changed:** 
+  - scripts/generate-python-client.sh (modified - uvx fallback)
+  - packages/repl/src/commands.ts (modified - removed goal/run commands)
+  - packages/shared/js-client/src/* (regenerated, Goal/Run services removed)
+  - packages/shared/python-client/* (regenerated)
+- **Learnings for future iterations:**
+  - REPL package also uses the js-client - when removing API endpoints, also update REPL commands
+  - Python client generator can be run via `uvx openapi-python-client` if not installed globally
+  - test:check-generate runs generate and verifies no git diff - useful for CI
 ---
 

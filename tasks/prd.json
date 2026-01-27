@@ -168,8 +168,8 @@
         "Typecheck passes (pnpm build)"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Regenerated JS and Python clients. Updated generate-python-client.sh to use uvx as fallback. Also cleaned up REPL commands.ts to remove goal/run commands that used the removed API client services."
     },
     {
       "id": "US-012",
