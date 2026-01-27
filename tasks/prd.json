@@ -155,8 +155,8 @@
         "Remove Run-related request/response schemas from openapi.yaml"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Removed all runs endpoints (/api/v1/runs, /api/v1/runs/{id}, /api/v1/runs/{id}/steps) and related schemas (Run, RunWithGoal, Step, RunStatus, RunId, RunStatusQuery, Goal, OutputKind, MemoryType)"
     },
     {
       "id": "US-011",
